@@ -1,0 +1,7 @@
+struct ControllerData
+{
+    long voltage;
+    long speedl;
+    long speedr;
+    long angular;
+};

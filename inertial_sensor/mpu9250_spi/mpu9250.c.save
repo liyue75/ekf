@@ -1,0 +1,291 @@
+#include "mpu9250.h"
+#include "mpu9250_regs.h"
+#include "mpu9250_params.h"
+#include "xtimer.h"
+#include "thread.h"
+#include "xtimer.h"
+#include "fusion_math.h"
+#include "definitions.h"
+#include "spi_device.h"
+#include "check_reg.h"
+#include "backend.h"
+#include "fusion_math.h"
+
+#define ENABLE_DEBUG    (1)
+#include "debug.h"
+
+/*
+__attribute__((unused)) static int16_t _raw_temp;
+static uint8_t _gyro_instance;
+static uint8_t _accel_instance;
+
+static float temp_sensitivity = 1.0f/340;
+static float temp_zero = 36.53f;
+
+static float _temp_filtered;
+static float _accel_scale;
+static float _gyro_scale;
+
+static float _fifo_accel_scale;
+static float _fifo_gyro_scale;
+static uint32_t last_reset_ms;
+static uint8_t reset_count;
+
+static bool _enable_offset_checking;
+static bool _fast_sampling;
+static uint8_t _gyro_fifo_downsample_rate;
+static uint8_t _accel_fifo_downsample_rate;
+static uint8_t _gyro_to_accel_sample_rate;
+static uint16_t _gyro_backend_rate_hz;
+static uint16_t _accel_backend_rate_hz;
+*/
+static uint32_t last_reset_ms;
+static uint8_t last_stat_user_ctrl;
+static uint16_t sample_accel_count;
+static uint32_t sample_accel_start_us;
+static uint16_t sample_gyro_count;
+static uint32_t sample_gyro_start_us;
+static bool enable_offset_checking;
+static float temp_zero;
+static float temp_sensitivity;
+static float gyro_raw_sample_rates;
+static uint8_t gyro_over_sampling;
+static uint16_t gyro_raw_sampling_multiplier;
+static float accel_raw_sample_rates;
+static uint8_t accel_over_sampling;
+static uint16_t accel_raw_sampling_multiplier;
+static bool gyro_cal_ok;
+static bool accel_cal_ok;
+static uint8_t gyro_fifo_downsample_rate;
+static uint8_t accel_fifo_downsample_rate;
+static uint8_t gyro_to_accel_sample_ratio;
+static bool accel_sensor_rate_sampling_enabled;
+static bool gyro_sensor_rate_sampling_enabled;
+static uint16_t gyro_backend_rate_hz;
+static uint16_t accel_backend_rate_hz;
+
+
+static bool enable_fast_sampling = true;
+
+/*
+static uint8_t *_fifo_buffer;
+*/
+
+static uint8_t register_read(uint8_t reg)
+{
+    uint8_t val = 0;
+/*
+    DEBUG("reg = 0x%x, &_mpu9250_spi_params[0]->spi = %d \
+          , cs = %lu, clk = %lu, mode = %d, flag = 0x%x\n", reg, \
+          (_mpu9250_spi_params[0]).spi, \
+          (_mpu9250_spi_params[0]).cs, \
+          (&_mpu9250_spi_params[0])->clk, \
+          (&_mpu9250_spi_params[0])->mode, \
+          (&_mpu9250_spi_params[0])->read_flag \
+    );
+*/
+    read_registers(&_mpu9250_spi_params[0], reg, &val, 1);
+    return val;
+}
+
+static void register_write(uint8_t reg, uint8_t val)
+{
+    write_register(&_mpu9250_spi_params[0], reg, val);
+}
+
+static void register_write_check(uint8_t reg, uint8_t val)
+{
+    set_checked_register(reg, val);
+    write_register(&_mpu9250_spi_params[0], reg, val);
+}
+
+static bool check_whoami(void)
+{
+    uint8_t whoami = register_read(MPU9X50_WHO_AM_I_REG);
+    DEBUG("whoami = 0x%x\n", whoami);
+    if (whoami == MPU_WHOAMI_MPU9250) {
+        return true;
+    }
+    return false;
+}
+
+__attribute__((unused)) static bool mpu9250_hardware_init(void)
+{
+    if (!check_whoami()) {
+        return false;
+    }
+    //xtimer_usleep(10000);
+    /*
+    for(uint8_t i=0; i< 10; i++) {
+        check_whoami();
+        xtimer_usleep(10000);
+    }
+*/
+    //chip reset
+    uint8_t tries;
+    for (tries = 0; tries < 5; tries++) {
+        last_stat_user_ctrl = register_read(MPU9X50_USER_CTRL_REG);
+        DEBUG("last_stat_user_ctrl = 0x%x\n", last_stat_user_ctrl);
+        if (last_stat_user_ctrl & BIT_USER_CTRL_I2C_MST_EN) {
+            last_stat_user_ctrl &= ~BIT_USER_CTRL_I2C_MST_EN;
+            register_write(MPU9X50_USER_CTRL_REG, last_stat_user_ctrl);
+            xtimer_usleep(10000);
+        }
+        /* reset device */
+        register_write(MPU9X50_PWR_MGMT_1_REG, BIT_PWR_MGMT_1_DEVICE_RESET);
+        xtimer_usleep(100000);
+        //mpu spi initialize
+        last_stat_user_ctrl |= BIT_USER_CTRL_I2C_IF_DIS;
+        register_write(MPU9X50_USER_CTRL_REG, last_stat_user_ctrl);
+        //wake up device and select GyroZ clock
+        register_write(MPU9X50_PWR_MGMT_1_REG, BIT_PWR_MGMT_1_CLK_ZGYRO);
+        xtimer_usleep(5000);
+        if (register_read(MPU9X50_PWR_MGMT_1_REG) == BIT_PWR_MGMT_1_CLK_ZGYRO) {
+            DEBUG(" pll clock selected\n");
+            break;
+        }
+        xtimer_usleep(10000);
+        if ((register_read(MPU9X50_INT_STATUS) & BIT_RAW_RDY_INT) != 0) {
+            DEBUG("data ready\n");
+            break;
+        }
+    }
+    //register_write(MPU9X50_USER_CTRL_REG, 0x34);
+    //xtimer_usleep(100000);
+    //_ = register_read(MPU9X50_USER_CTRL_REG);
+    //DEBUG("after tries,  = 0x%x\n", last_stat_user_ctrl);
+    if (tries == 5) {
+        DEBUG("failed to boot mpu9250 5 times\n");
+        return false;
+    }
+
+    //check_whoami();
+    return true;
+}
+
+bool sensor_init(void)
+{
+    bool success = true;
+    spi_init(_mpu9250_spi_params[0].spi);
+    int ret  = spi_init_cs(_mpu9250_spi_params[0].spi, _mpu9250_spi_params[0].cs);
+    if (ret != 0) {
+        DEBUG("[mpu9250] spi cs init error, ret = %d", ret);
+        return false;
+    }
+    success = mpu9250_hardware_init();
+    DEBUG("[mpu9250] hardware init: success = %d\n", success);
+    return success;
+}
+
+static void notify_gyro_fifo_reset(void)
+{
+    sample_gyro_count = 0;
+    sample_gyro_start_us = 0;
+}
+
+static void notify_accel_fifo_reset(void)
+{
+    sample_accel_count = 0;
+    sample_accel_start_us = 0;
+}
+
+__attribute__((unused))static bool register_gyro(uint16_t raw_sample_rate_hz)
+{
+    gyro_raw_sample_rates = raw_sample_rate_hz;
+    gyro_over_sampling = 1;
+    gyro_raw_sampling_multiplier = INT16_MAX / radians(2000);
+    gyro_cal_ok = false;
+    return true;
+}
+
+__attribute__((unused)) static bool register_accel(uint16_t raw_sample_rate_hz)
+{
+    accel_raw_sample_rates = raw_sample_rate_hz;
+    accel_over_sampling = 1;
+    accel_raw_sampling_multiplier = INT16_MAX / (16 * GRAVITY_MSS);
+    accel_cal_ok = false;
+    return true;
+}
+
+static void fifo_reset(void)
+{
+    uint32_t now = xtimer_now().ticks32 / 1000;
+    last_reset_ms = now;
+    uint8_t user_ctrl = last_stat_user_ctrl;
+    user_ctrl &= ~(BIT_USER_CTRL_FIFO_RESET | BIT_USER_CTRL_FIFO_EN);
+    uint8_t val = register_read(MPU9X50_FIFO_EN_REG);
+    DEBUG("user_ctrl = 0x%x, fifo en reg = 0x%x\n", user_ctrl, val);
+    register_write(MPU9X50_FIFO_EN_REG, 0);
+    xtimer_usleep(1000);
+    val = register_read(MPU9X50_FIFO_EN_REG);
+    DEBUG("after write: fifo en reg = 0x%x\n", val);
+    register_write(MPU9X50_USER_CTRL_REG, user_ctrl);
+    register_write(MPU9X50_USER_CTRL_REG, user_ctrl | BIT_USER_CTRL_FIFO_RESET);
+    register_write(MPU9X50_USER_CTRL_REG, user_ctrl | BIT_USER_CTRL_FIFO_EN);
+    register_write(MPU9X50_FIFO_EN_REG, BIT_XG_FIFO_EN | BIT_YG_FIFO_EN |
+                   BIT_ZG_FIFO_EN | BIT_ACCEL_FIFO_EN | BIT_TEMP_FIFO_EN);
+    xtimer_usleep(1000);
+    val = register_read(MPU9X50_USER_CTRL_REG);
+    DEBUG("user ctrl reg = 0x%x\n", val);
+    last_stat_user_ctrl = user_ctrl | BIT_USER_CTRL_FIFO_EN;
+    notify_accel_fifo_reset();
+    notify_gyro_fifo_reset();
+}
+
+static void set_accel_oversampling(uint8_t n)
+{
+    accel_over_sampling = n;
+}
+
+static void set_gyro_oversampling(uint8_t n)
+{
+    gyro_over_sampling = n;
+}
+
+static void set_filter_register(void)
+{
+    uint8_t config = 0;
+    gyro_fifo_downsample_rate = accel_fifo_downsample_rate = 1;
+    gyro_to_accel_sample_ratio = 2;
+    gyro_backend_rate_hz = accel_backend_rate_hz = 1000;
+    if (enable_fast_sampling) {
+        uint8_t loop_limit = 1;
+        if (get_imu_loop_rate_hz() > 1000) {
+            loop_limit = 2;
+        }
+        if (get_imu_loop_rate_hz() > 2000) {
+            loop_limit = 4;
+        }
+        uint8_t fast_sampling_rate = constrain_value(get_fast_sampling_rate(), loop_limit, 8);
+        gyro_fifo_downsample_rate = 8 / fast_sampling_rate;
+        gyro_backend_rate_hz *= fast_sampling_rate;
+        accel_fifo_downsample_rate = MAX(4 / fast_sampling_rate, 1);
+        accel_backend_rate_hz *= MIN(fast_sampling_rate, 4);
+        set_accel_oversampling(accel_fifo_downsample_rate);
+        set_gyro_oversampling(gyro_fifo_downsample_rate);
+        accel_sensor_rate_sampling_enabled = true;
+        gyro_sensor_rate_sampling_enabled = true;
+        register_write(MPU9X50_SLAVE4_CTRL_REG, 0x1F);
+        config |= BITS_DLPF_CFG_256HZ_NOLPF2;
+    }
+    config |= MPUREG_CONFIG_FIFO_MODE_STOP;
+    register_write_check(MPU9X50_LPF_REG, config);
+    register_write_check(MPU9X50_ACCEL_CFG_REG2, ICM_ACC_FCHOICE_B);
+
+}
+
+void sensor_start(void)
+{
+    register_write(MPU9X50_PWR_MGMT_2_REG, 0x00);
+    xtimer_usleep(1000);
+    uint8_t val = register_read(MPU9X50_PWR_MGMT_2_REG);
+    DEBUG("mgmt 2 pwr val = 0x%x\n", val);
+    fifo_reset();
+    enable_offset_checking = true;
+    temp_zero = 21.0f;
+    temp_sensitivity = 1.0f / 340;
+    if (!register_gyro(1000) || !register_accel(1000)) {
+        return;
+    }
+    set_filter_register();
+}
