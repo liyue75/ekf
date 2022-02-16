@@ -374,7 +374,7 @@ void quat_normalize(quaternionf_t *q)
         q->q3 *= quat_mag_inv;
         q->q4 *= quat_mag_inv;
     } else {
-        led_on(LED_3);
+        //led_on(LED_3);
     }
 }
 

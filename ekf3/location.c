@@ -1,15 +1,14 @@
 #include "location.h"
 #include "definitions.h"
 
-__attribute__((unused))static const float LOCATION_SCALING_FACTOR = LATLON_TO_M;
-__attribute__((unused))static const float LOCATION_SCALING_FACTOR_INV = LATLON_TO_M_INV;
-static int32_t alt;
-static int32_t lat;
-static int32_t lng;
+const float LOCATION_SCALING_FACTOR = LATLON_TO_M;
+const float LOCATION_SCALING_FACTOR_INV = LATLON_TO_M_INV;
 
-void init_location(void)
+location_t _location;
+
+void init_location(location_t *location)
 {
-    alt = 0;
-    lat = 0;
-    lng = 0;
+    location->alt = 0;
+    location->lat = 0;
+    location->lng = 0;
 }

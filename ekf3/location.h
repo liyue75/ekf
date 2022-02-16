@@ -9,6 +9,12 @@ ABOVE_ORIGIN = 2,
 ABOVE_TERRAIN = 3
 } alt_frame_t;
 
-void init_location(void);
+typedef struct {
+    int32_t alt;
+    int32_t lat;
+    int32_t lng;
+} location_t;
+
+void init_location(location_t *loc);
 
 #endif // LOCATION_H_

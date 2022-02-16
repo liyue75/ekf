@@ -5,6 +5,7 @@
 #include "check_reg.h"
 #include "uart_device.h"
 #include "ahrs.h"
+#include "gps.h"
 
 // IMU variables
 // Integration time; time last loop took to run
@@ -18,7 +19,7 @@ static const task_t scheduler_tasks[] = {
 static void init_ap(void)
 {
     //compass_init();
-    //gps_init();
+    gps_init();
     //wheel_encoder_init();
 
     ahrs_init();

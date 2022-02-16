@@ -2,6 +2,7 @@
 #include "thread.h"
 #include "uart_device.h"
 #include "tsrb.h"
+#include "xtimer.h"
 
 #define ENABLE_DEBUG (1)
 #include "debug.h"
@@ -37,10 +38,10 @@ static void *uart_tx_thread(__attribute__((unused))void *arg)
     return NULL;
 }
 
-static bool thread_rx_init(void)
-{
-    return true;
-}
+/* static bool thread_rx_init(void) */
+/* { */
+/*     return true; */
+/* } */
 
 static bool uart_pipe_init(void)
 {
@@ -65,7 +66,7 @@ static bool thread_tx_init(void)
                                      uart_tx_thread,
                                      NULL,
                                      "console_tx_thread");
-    //DEBUG("pid = %d\n", pid);
+    DEBUG("uart tx pid = %d, prio = %d\n", pid, HAL_UART_TX_THREAD_PRIORITY);
     if (pid < 0) {
         DEBUG("Could not create UART TX thread\n");
         return false;
@@ -74,11 +75,42 @@ static bool thread_tx_init(void)
     return true;
 }
 
+/* static void rx_timer_tick(void) */
+/* { */
+
+/* } */
+
+/* static void *uart_rx_thread(__attribute((unused))void *arg) */
+/* { */
+/*     while (true) { */
+/*         xtimer_usleep(1000); */
+/*         rx_timer_tick(); */
+/*     } */
+/*     return NULL; */
+/* } */
+
+/* static bool thread_rx_init(void) */
+/* { */
+/*     kernel_pid_t pid = thread_create(uart_rx_thread_stack, */
+/*                                      sizeof(uart_rx_thread_stack), */
+/*                                      UART_RX_THREAD_PRIORITY, */
+/*                                      THREAD_CREATE_WOUT_YIELD, */
+/*                                      uart_rx_thread, */
+/*                                      NULL, */
+/*                                      "uart rx thread"); */
+/*     if (pid > 0) { */
+/*         DEBUG("gps uart rx thread pid = %d, priority = %d\n", pid, */
+/*               UART_RX_THREAD_PRIORITY); */
+/*         return true; */
+/*     } */
+/*     return false; */
+/* } */
+
 bool serial_init(void)
 {
     bool ret = true;
     uart_init(HAL_UART_DEV, HAL_UART_BAUD, NULL, NULL);
-    ret = thread_rx_init();
+    //ret = thread_rx_init();
     if (ret == false) {
         return false;
     }

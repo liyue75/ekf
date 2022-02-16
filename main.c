@@ -7,13 +7,14 @@
 #include "inertial_sensor.h"
 #include "uart_device.h"
 #include "vehicle.h"
+#include "mutex.h"
+#include "ringbuffer.h"
 
 #include "stdlib.h"
 #include "math.h"
 #include "arm_math.h"
 #include "lowpass_filter2p.h"
 #include "board_led.h"
-
 #include "matrix3f.h"
 
 #define ENABLE_DEBUG 1
@@ -25,6 +26,7 @@
 
 extern kernel_pid_t spi_pid;
 extern char device_periodic_stack[];
+extern ringbuffer_t gps_buffer;
 
 int main(void)
 {
@@ -142,15 +144,13 @@ int main(void)
     /* printf("test length = %d\n", (int)v3f_length(&test)); */
     /* printf("normalize {2, 2, 1} = {%d, %d, %d}\n", (int)(test2.x * 10), (int)test2.y * 10, */
     /*        (int)(test2.z * 10)); */
+    mutex_t main_m;
+    mutex_init(&main_m);
     uint32_t start3 = xtimer_now().ticks32;
-    float ab = 1.345, cb = 7.958;
-    float *abd=  &ab, *ccb = &cb;
-    for (int i = 0; i < 100; i++) {
-        *ccb = *ccb * *abd;
-    }
+    mutex_lock(&main_m);
+    mutex_unlock(&main_m);
     uint32_t end3 = xtimer_now().ticks32;
-    DEBUG("mul time =  %ld, c = %f\n", end3 - start3, *ccb);
-    DEBUG("float = %f\n", 4.321567);
+    DEBUG("mul time =  %ld\n", end3 - start3);
     //thread_stack_print();
     //uint32_t size = thread_measure_stack_free(device_periodic_stack);
     //DEBUG("spi periodic thread free size = %ld\n", size);
@@ -165,16 +165,16 @@ int main(void)
         //MY_LOGN(n2, "last_write = %d, print time = %lu\n", n, end - start);
         //DEBUG("n2 = %d\n", n2);
 
-        float a = -3.1;
-        __attribute__((unused))float b;
-        int i;
-        __attribute__((unused))uint32_t start = xtimer_now().ticks32;
-        for (i = 0; i < 100; i++) {
-            b = fabs(a);
-        }
-        __attribute__((unused))uint32_t end = xtimer_now().ticks32;
-        //DEBUG("fabs 100 time = %ld, time = %ld\n", end - start, end);
-        /* uint32_t start2 = xtimer_now().ticks32; */
+        /* float a = -3.1; */
+        /* __attribute__((unused))float b; */
+        /* int i; */
+        /* __attribute__((unused))uint32_t start = xtimer_now().ticks32; */
+        /* for (i = 0; i < 100; i++) { */
+        /*     b = fabs(a); */
+        /* } */
+        /* __attribute__((unused))uint32_t end = xtimer_now().ticks32; */
+        /* DEBUG("fabs 100 time = %ld, time = %ld\n", end - start, end); */
+        /* /\* uint32_t start2 = xtimer_now().ticks32; *\/ */
         /* for (i = 0; i < 100; i++) { */
         /*     arm_abs_f32(&a, &b, 1); */
         /* } */
@@ -190,8 +190,9 @@ int main(void)
         /* uint32_t end2 = xtimer_now().ticks32; */
         /* DEBUG("64 time = 0x%lx, val2 = 0x%ld %ld\n", end2 - start2, (uint32_t)(val2 >> 32), */
         /*       (uint32_t)(val2 & 0xffffffff)); */
-
+        /* char tmp[128] = {0}; */
+        /* ringbuffer_get(&gps_buffer, tmp, 128); */
+        /* printf("%s\n", tmp); */
     }
-
     return 0;
 }

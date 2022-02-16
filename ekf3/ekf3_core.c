@@ -65,9 +65,11 @@ ekf_timing_t _timing;
 
 inactive_bias_t _inactive_bias;
 
+extern location_t _location;
+
 void init_ekf3_core(void)
 {
-    init_location();
+    init_location(&_location);
     first_init_time_ms = 0;
     last_init_fail_report_ms = 0;
 }

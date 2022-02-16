@@ -31,4 +31,5 @@ float sq(const float v);
 float sq_3f(const float first, const float second, const float third);
 float wrap_PI(const float radian);
 float wrap_2PI(const float radian);
+float wrap_360(const float angle);
 #endif // FUSION_MATH_H_

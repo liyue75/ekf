@@ -106,3 +106,12 @@ float wrap_PI(const float radian)
     }
     return res;
 }
+
+float wrap_360(const float angle)
+{
+    float res = fmod(angle, 360.0);
+    if (res < 0) {
+        res += 360.0;
+    }
+    return res;
+}

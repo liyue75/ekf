@@ -1,0 +1,16 @@
+#ifndef NMEA_H_
+#define NMEA_H_
+
+typedef enum {
+GPS_SENTENCE_RMC = 32,
+GPS_SENTENCE_GGA = 64,
+GPS_SENTENCE_VTG = 96,
+GPS_SENTENCE_HDT = 128,
+GPS_SENTENCE_PHD = 138,
+GPS_SENTENCE_THS = 160,
+GPS_SENTENCE_OTHER = 0
+} sentence_types_t;
+
+
+
+#endif // NMEA_H_

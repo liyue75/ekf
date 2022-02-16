@@ -121,6 +121,11 @@ FEATURES_REQUIRED += periph_uart
     INCLUDES += -I$(CURDIR)/gps
     USEMODULE += gps
 
+# common
+    EXTERNAL_MODULE_DIRS += $(CURDIR)/common
+    INCLUDES += -I$(CURDIR)/common
+    USEMODULE += common
+
 #microdds
     #CFLAGS += -DPOSIX_SETSOCKOPT
     USEMODULE += posix_sockets
