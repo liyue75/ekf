@@ -81,9 +81,27 @@ typedef struct {
     uint32_t rel_pos_heading_ts;
 } gps_status_t;
 
+typedef struct {
+    uint32_t last_fix_time_ms;
+    uint32_t last_message_time_ms;
+    uint16_t delta_time_ms;
+    uint8_t delayed_count;
+    float average_delta_ms;
+} gps_timing_t;
 
-void gps_get_lag(float *lag_sec);
+bool gps_get_lag(float *lag_sec);
 void gps_init(void);
 bool gps_read(void);
 uint64_t receive_time_constraint_us(uint16_t nbytes);
+uint32_t gps_last_message_time_ms(void);
+uint32_t gps_last_message_delta_time_ms(void);
+gps_status_enum_t gps_status(void);
+vector3f_t gps_velocity(void);
+bool gps_have_vertical_velocity(void);
+bool gps_speed_accuracy(float *sacc);
+bool gps_horizontal_accuracy(float *hacc);
+bool gps_vertical_accuracy(float *vacc);
+uint8_t gps_num_sats(void);
+uint16_t gps_get_hdop(void);
+location_t *gps_location(void);
 #endif // GPS_H_

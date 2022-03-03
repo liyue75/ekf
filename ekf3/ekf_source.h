@@ -2,6 +2,7 @@
 #define EKF_COURCE_H_
 
 #include <stdint.h>
+#include <stdbool.h>
 
 typedef enum {
 XY_NONE = 0,
@@ -30,5 +31,14 @@ YAW_EXTNAV = 6,
 YAW_GSF = 8
 } source_yaw_t;
 
+typedef struct {
+    source_xy_t posxy;
+    source_xy_t velxy;
+    source_z_t posz;
+    source_z_t velz;
+    source_yaw_t yaw;
+} source_set_t;
+
+bool ekf_use_vel_z_source(source_z_t velz_source);
 
 #endif // EKF_COURCE_H_

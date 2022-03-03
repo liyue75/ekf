@@ -38,13 +38,18 @@ __attribute__((unused))static int8_t auto_config = 1;
 int16_t _rate_ms = 200; // 100:10hz 125:8hz 200:5hz. Raising the rate above 5hz usually provides little benefit
                        // and for some GPS(eg Ublox M9N) can severely impact performance
 __attribute__((unused))static vector3f_t antenna_offset = {0, 0, 0};
-int16_t _delay_ms = 0; //set to zero to use the default delay for the detected GPS type;
+__attribute__((unused))static int16_t delay_ms = 0; //set to zero to use the default delay for the detected GPS type;
 
+static gps_timing_t _gps_timing;
 gps_status_t _gps_state;
 
-void gps_get_lag(float *lag_sec)
+bool gps_get_lag(float *lag_sec)
 {
-    *lag_sec = 0.07;
+    /* if (delay_ms > 0) { */
+    /*     lag_sec = 0.001f * delay_ms; */
+    /* } */
+    *lag_sec = 0.2f;
+    return true;
 }
 
 static void receive_timestamp_update(void)
@@ -76,4 +81,71 @@ void gps_init(void)
     if (_rate_ms <= 0 || _rate_ms > GPS_MAX_RATE_MS) {
         _rate_ms = GPS_MAX_RATE_MS;
     }
+}
+
+uint32_t gps_last_message_time_ms(void)
+{
+    return _gps_timing.last_message_time_ms;
+}
+
+uint32_t gps_last_message_delta_time_ms(void)
+{
+    return _gps_timing.delta_time_ms;
+}
+
+gps_status_enum_t gps_status(void)
+{
+    return _gps_state.status;
+}
+
+vector3f_t gps_velocity(void)
+{
+    return _gps_state.velocity;
+}
+
+bool gps_have_vertical_velocity(void)
+{
+    return _gps_state.have_vertical_velocity;
+}
+
+bool gps_speed_accuracy(float *sacc)
+{
+    if (_gps_state.have_speed_accuracy) {
+        *sacc = _gps_state.speed_accuracy;
+        return true;
+    }
+    return false;
+}
+
+bool gps_horizontal_accuracy(float *hacc)
+{
+    if (_gps_state.have_horizontal_accuracy) {
+        *hacc = _gps_state.horizontal_accuracy;
+        return true;
+    }
+    return false;
+}
+
+bool gps_vertical_accuracy(float *vacc)
+{
+    if (_gps_state.have_vertical_accuracy) {
+        *vacc = _gps_state.vertical_accuracy;
+        return true;
+    }
+    return false;
+}
+
+uint8_t gps_num_sats(void)
+{
+    return _gps_state.num_sats;
+}
+
+uint16_t gps_get_hdop(void)
+{
+    return _gps_state.hdop;
+}
+
+location_t *gps_location(void)
+{
+    return &_gps_state.location;
 }

@@ -9,10 +9,14 @@
 #include "vehicle.h"
 #include "mutex.h"
 #include "ringbuffer.h"
+#include "common_nmea.h"
+#include "ak8963.h"
+#include "ekf3_core.h"
+#include "nav_common.h"
 
 #include "stdlib.h"
 #include "math.h"
-#include "arm_math.h"
+//#include "arm_math.h"
 #include "lowpass_filter2p.h"
 #include "board_led.h"
 #include "matrix3f.h"
@@ -27,6 +31,23 @@
 extern kernel_pid_t spi_pid;
 extern char device_periodic_stack[];
 extern ringbuffer_t gps_buffer;
+
+//Matrix24 test_m = {{0, 0, 1, 1}, {2, 2, 2}, {3, 3, 3, 3}};
+bool test_vsnprintf(const char *fmt, ...)
+{
+    uint32_t start = xtimer_now().ticks32;
+    __attribute__((unused))va_list ap;
+    va_start(ap, fmt);
+    char *s = nmea_vaprintf(fmt, ap);
+    va_end(ap);
+    if (s == NULL) {
+        return false;
+    }
+    uint32_t end = xtimer_now().ticks32;
+    DEBUG("s = %s, nmea_vaprintf time = %ld\n", s, end - start);
+    free(s);
+    return true;
+}
 
 int main(void)
 {
@@ -154,8 +175,27 @@ int main(void)
     //thread_stack_print();
     //uint32_t size = thread_measure_stack_free(device_periodic_stack);
     //DEBUG("spi periodic thread free size = %ld\n", size);
+    //test_vsnprintf("hello %s %d", "world", 100);
+    /* Matrix24 * con_mat = &test_m; */
+    /* printf("con_mat[1][1] = %f\n", con_mat[0][1][1]); */
+    /* ekf3_core_zero_cols(&test_m, 1, 2); */
+    /* for (int j = 0; j < 3; j++) { */
+    /*     for (int i = 0; i< 23; i++) { */
+    /*         printf("%d ", (int)test_m[j][i]); */
+    /*     } */
+    /*     printf("\n"); */
+    /* } */
+    /* printf("\n"); */
+    /* for (int i=0; i< 3; i++) { */
+    /*     printf("test_m[%d][0] addr = %d\n", i, (int)&test_m[i][0]); */
+    /* } */
     while(1) {
-        xtimer_periodic_wakeup(&last_wakeup, INTERVAL);
+        xtimer_periodic_wakeup(&last_wakeup, 10000);
+        /* if (gpio_read(IMU_CAL_SWITCH)) { */
+        /*     led_on(LED_2); */
+        /* } else { */
+        /*     led_off(LED_2); */
+        /* } */
         //uint32_t start = xtimer_now().ticks32;
         //__attribute__((unused)) int n;
         //MY_LOGN(n, "slept until %" PRIu32 ", xtimer=%lu\n",
@@ -190,8 +230,8 @@ int main(void)
         /* uint32_t end2 = xtimer_now().ticks32; */
         /* DEBUG("64 time = 0x%lx, val2 = 0x%ld %ld\n", end2 - start2, (uint32_t)(val2 >> 32), */
         /*       (uint32_t)(val2 & 0xffffffff)); */
-        /* char tmp[128] = {0}; */
-        /* ringbuffer_get(&gps_buffer, tmp, 128); */
+        /* char tmp[256] = {0}; */
+        /* ringbuffer_get(&gps_buffer, tmp, 256); */
         /* printf("%s\n", tmp); */
     }
     return 0;

@@ -13,19 +13,25 @@
 #include "lowpass_filter2p.h"
 #include "uart_device.h"
 #include "board_led.h"
+#include "accel_cal.h"
 //#define IMU_LOOP_RATE_HZ 8000
 #define IMU_FAST_SAMPLING_RATE 0
 
+extern bool _accel_calibrator_inited;
 extern uint16_t _loop_rate;
 static uint8_t fast_sampling_rate;
-//float _temperature;
+static uint16_t last_accel_filter_hz = 0;
+static uint16_t last_gyro_filter_hz = 0;
+extern uint16_t _accel_filter_cutoff;
+extern uint16_t _gyro_filter_cutoff;
+float _temperature;
 //bool _tcal_learning;
 
 static mutex_t backend_mutex;
 
 extern bool _calibrating_accel;
 extern bool _calibrating_gyro;
-extern void *_acal;
+extern bool _acal_inited;
 
 extern vector3f_t _accel_scale;
 extern vector3f_t _accel_offset;
@@ -54,8 +60,18 @@ extern vector3f_t _accel_filtered;
 extern vector3f_t _gyro_filtered;
 extern bool _new_accel_data;
 extern bool _new_gyro_data;
+extern vector3f_t _gyro;
+extern vector3f_t _accel;
+extern bool _accel_healthy;
+extern bool _gyro_healthy;
+extern vector3f_t _delta_velocity;
+extern float _delta_velocity_dt;
+extern bool _delta_velocity_valid;
+extern vector3f_t _delta_angle;
+extern float _delta_angle_dt;
+extern bool _delta_angle_valid;
 
-void backend_init(void)
+void imu_backend_init(void)
 {
     fast_sampling_rate = IMU_FAST_SAMPLING_RATE;
     mutex_init(&backend_mutex);
@@ -72,7 +88,7 @@ void rotate_and_correct_accel(vector3f_t *accel, Rotation_t orientation)
     /* if (_tcal_learning) { */
     /*     update_accel_learning(accel, _temperature); */
     /* } */
-    if (!_calibrating_accel && (_acal == NULL || !acal_running())) {
+    if (!_calibrating_accel && (!_acal_inited || !acal_running())) {
         accel->x -= _accel_offset.x;
         accel->y -= _accel_offset.y;
         accel->z -= _accel_offset.z;
@@ -165,7 +181,7 @@ void notify_new_accel_raw_sample(__attribute__((unused))vector3f_t *accel,
         _accel_filtered = lpf2p_v3f_apply(accel, &_accel_filter);
         if (v3f_isnan(&_accel_filtered) || v3f_isinf(&_accel_filtered)) {
             lpf2p_v3f_reset(&_accel_filter);
-            MY_LOG("accel filtered is nan or inf\n");
+            //MY_LOG("accel filtered is nan or inf\n");
             led_on(LED_1);
         }
         set_accel_peak_hold(&_accel_filtered);
@@ -215,4 +231,67 @@ void notify_new_gyro_raw_sample(vector3f_t *gyro, __attribute__((unused))uint64_
 
         mutex_unlock(&backend_mutex);
     }
+}
+
+static void publish_accel(vector3f_t *accel)
+{
+    _accel = *accel;
+    _accel_healthy = true;
+    _delta_velocity = _delta_velocity_acc;
+    _delta_velocity_dt = _delta_velocity_acc_dt;
+    _delta_velocity_valid = true;
+    v3f_zero(&_delta_velocity_acc);
+    _delta_velocity_acc_dt = 0;
+    if (_accel_calibrator_inited && acal_cal_get_status() == ACCEL_CAL_COLLECTING_SAMPLE) {
+        vector3f_t cal_sample = _delta_velocity;
+        //rotate_inverse(_board_orientation);
+        acal_cal_new_sample(&cal_sample, _delta_velocity_dt);
+    }
+
+}
+
+void backend_update_accel(void)
+{
+    mutex_lock(&backend_mutex);
+    if (_new_accel_data) {
+        publish_accel(&_accel_filtered);
+        _new_accel_data = false;
+    }
+    if (last_accel_filter_hz != _accel_filter_cutoff) {
+        lpf2p_set_cutoff_frequency(_accel_raw_sample_rates, _accel_filter_cutoff,
+                                   &_accel_filter);
+        last_accel_filter_hz = _accel_filter_cutoff;
+    }
+    mutex_unlock(&backend_mutex);
+}
+
+static void publish_gyro(vector3f_t * gyro)
+{
+    _gyro = *gyro;
+    _gyro_healthy = true;
+    _delta_angle = _delta_angle_acc;
+    _delta_angle_dt = _delta_angle_acc_dt;
+    _delta_angle_valid = true;
+    v3f_zero(&_delta_angle_acc);
+    _delta_angle_acc_dt = 0;
+}
+
+void backend_update_gyro(void)
+{
+    mutex_lock(&backend_mutex);
+    if (_new_gyro_data) {
+        publish_gyro(&_gyro_filtered);
+        _new_gyro_data = false;
+    }
+    if (last_gyro_filter_hz != _gyro_filter_cutoff || sensors_converging()) {
+        lpf2p_set_cutoff_frequency(_gyro_raw_sample_rates, _gyro_filter_cutoff,
+                                   &_gyro_filter);
+        last_gyro_filter_hz = _gyro_filter_cutoff;
+    }
+    mutex_unlock(&backend_mutex);
+}
+
+void backend_publish_temperature(float temperature)
+{
+    _temperature = temperature;
 }

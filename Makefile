@@ -33,7 +33,7 @@ USEMODULE += ps
 #USEMODULE += netstats_ipv6
 #USEMODULE += netstats_rpl
 
-USEPKG += cmsis-dsp
+#USEPKG += cmsis-dsp
 USEMODULE += printf_float
 
 # w5100
@@ -55,7 +55,7 @@ FEATURES_REQUIRED += periph_spi
 
 # uart
 FEATURES_REQUIRED += periph_uart
-
+FEATURES_REQUIRED += periph_i2c
 # notify
     EXTERNAL_MODULE_DIRS += $(CURDIR)/notify
     INCLUDES += -I$(CURDIR)/notify
@@ -125,6 +125,21 @@ FEATURES_REQUIRED += periph_uart
     EXTERNAL_MODULE_DIRS += $(CURDIR)/common
     INCLUDES += -I$(CURDIR)/common
     USEMODULE += common
+
+# compass
+    EXTERNAL_MODULE_DIRS += $(CURDIR)/compass
+    INCLUDES += -I$(CURDIR)/compass
+    USEMODULE += compass
+
+# dal
+    EXTERNAL_MODULE_DIRS += $(CURDIR)/dal
+    INCLUDES += -I$(CURDIR)/dal
+    USEMODULE += dal
+
+# declination
+    EXTERNAL_MODULE_DIRS += $(CURDIR)/declination
+    INCLUDES += -I$(CURDIR)/declination
+    USEMODULE += declination
 
 #microdds
     #CFLAGS += -DPOSIX_SETSOCKOPT

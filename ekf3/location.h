@@ -16,5 +16,7 @@ typedef struct {
 } location_t;
 
 void init_location(location_t *loc);
-
+float location_get_distance(const location_t *loc1, const location_t *loc2);
+int32_t diff_longitude(int32_t lon1, int32_t lon2);
+float longitude_scale(int32_t lat);
 #endif // LOCATION_H_

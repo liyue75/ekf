@@ -6,6 +6,11 @@
 
 #include "vector3f.h"
 
+typedef enum {
+GYRO_CAL_NEVER = 0,
+GYRO_CAL_STARTUP_ONLY =1
+} gyro_calibration_timing_t;
+
 void ins_init(uint16_t loop_rate);
 bool inertial_sensor_init(void);
 
@@ -30,5 +35,9 @@ bool get_accel_health(void);
 bool get_gyro_health(void);
 bool get_delta_velocity(vector3f_t *delta_velocity, float *delta_velocity_dt);
 bool get_delta_angle(vector3f_t *delta_angle, float *delta_angle_dt);
-vector3f_t *get_imu_pos_offset(void);
+vector3f_t get_imu_pos_offset(void);
+void ins_update(void);
+void init_gyro(void);
+bool gyro_calibrated_ok_all(void);
+void acal_init(void);
 #endif // INERTIAL_SENSOR_H_

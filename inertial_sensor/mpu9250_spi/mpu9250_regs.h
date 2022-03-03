@@ -115,6 +115,10 @@
 #define MPU9X50_SLAVE2_DATA_OUT_REG     (0x65)
 #define MPU9X50_SLAVE3_DATA_OUT_REG     (0x66)
 #define MPU9X50_I2C_DELAY_CTRL_REG      (0x67)
+# define BIT_I2C_SLV0_DLY_EN      (0x01)
+#define BIT_I2C_SLV1_DLY_EN     (0x02)
+#define BIT_I2C_SLV2_DLY_EN    (0x04)
+#define BIT_I2C_SLV3_DLY_EN    (0x08)
 #define MPU9X50_USER_CTRL_REG           (0x6A)
      #  define BIT_USER_CTRL_SIG_COND_RESET    (0x01) //resets signal paths and results registers for all sensors
      #  define BIT_USER_CTRL_I2C_MST_RESET     (0x02) //reset I2C Master (only applicable if I2C_MST_EN bit is set)

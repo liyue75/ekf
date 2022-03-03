@@ -12,7 +12,10 @@ static bool ekf3_started;
 __attribute__((unused))static float gps_gain = 1.0f;
 bool fly_forward;
 vehicle_class_t vehicle_class;
-
+static location_t home;
+static bool takeoff_expected;
+static matrix3f_t rotation_autopilot_body_to_vehicle_body;
+static matrix3f_t rotation_vehicle_body_to_autopilot_body;
 
 static vector3f_t last_trim = {0, 0, 0};
 static matrix3f_t rotation_imu_to_vehicle;
@@ -21,6 +24,11 @@ static matrix3f_t rotation_vehicle_to_imu;
 void set_fly_forward(bool b)
 {
     fly_forward = b;
+}
+
+bool get_fly_forward(void)
+{
+    return fly_forward;
 }
 
 void ahrs_init(void)
@@ -38,5 +46,40 @@ void ahrs_reset(void)
 {
     mutex_lock(&ahrs_rsem);
     ekf3_started = ekf_initialise_filter();
+    mutex_unlock(&ahrs_rsem);
+}
+
+bool ahrs_get_position(location_t *loc)
+{
+    if (ekf3_get_llh(loc)) {
+        return true;
+    }
+    return false;
+}
+
+location_t *ahrs_get_home(void)
+{
+    return &home;
+}
+
+bool get_takeoff_expected(void)
+{
+    return takeoff_expected;
+}
+
+matrix3f_t *get_rotation_autopilot_body_to_vehicle_body(void)
+{
+    return &rotation_autopilot_body_to_vehicle_body;
+}
+
+matrix3f_t *get_rotation_vehicle_body_to_autopilot_body(void)
+{
+    return &rotation_vehicle_body_to_autopilot_body;
+}
+
+void ahrs_reset_gyro_drift(void)
+{
+    mutex_lock(&ahrs_rsem);
+    ekf3_reset_gyro_bias();
     mutex_unlock(&ahrs_rsem);
 }

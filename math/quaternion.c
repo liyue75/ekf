@@ -341,7 +341,7 @@ void quat_from_rotation(quaternionf_t *q, Rotation_t rotation)
     }
     // rotation invalid
     DEBUG("Bad rotation\n");
-    led_on(LED_3);
+    led_on(LED_1);
 }
 
 float quat_length(const quaternionf_t *q)
@@ -435,7 +435,7 @@ quaternionf_t quat_div(const quaternionf_t *q, const quaternionf_t *v)
     const float quatMag = quat_length(q);
     if (float_is_zero(quatMag)) {
         // floathe code goes here if the quaternion is [0,0,0,0]. This shouldn't happen.
-        led_on(LED_3);
+        led_on(LED_1);
     }
 
     const float rquat0 = v->q1;

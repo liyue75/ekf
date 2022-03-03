@@ -11,8 +11,8 @@
 #define HAL_DEVICE_PERIODIC_THREAD_PRIORITY 6
 
 static char device_periodic_stack[HAL_DEVICE_PERIODIC_STACK_SIZE];
-static bool thread_started;
-static callback_info_t *callbacks;
+static bool thread_started = false;
+static callback_info_t *callbacks = NULL;
 static kernel_pid_t spi_pid;
 
 static void *bus_thread(__attribute__((unused))void *arg)

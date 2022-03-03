@@ -1,4 +1,6 @@
 #include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
 #include "nmea.h"
 #include "common.h"
 #include "xtimer.h"
@@ -53,6 +55,67 @@ static uint32_t last_fix_ms;
 extern gps_status_t _gps_state;
 extern int16_t _rate_ms;
 extern int8_t _type;
+
+static int32_t parse_decimal_100(const char *p)
+{
+    char *endptr = NULL;
+    long ret = 100 * strtol(p, &endptr, 10);
+    int sign = ret < 0 ? -1 : 1;
+    if (ret >= (long)INT32_MAX) {
+        return INT32_MAX;
+    }
+    if (ret <= (long)INT32_MIN) {
+        return INT32_MIN;
+    }
+    if (endptr == NULL || *endptr != '.') {
+        return ret;
+    }
+    if (isdigit((int)endptr[1])) {
+        ret += sign * 10 * DIGIT_TO_VAL(endptr[1]);
+        if (isdigit((int)endptr[2])) {
+            ret += sign * DIGIT_TO_VAL(endptr[2]);
+            if (isdigit((int)endptr[3])) {
+                ret += sign * (DIGIT_TO_VAL(endptr[3]) >= 5);
+            }
+        }
+    }
+    return ret;
+}
+
+static uint32_t parse_degrees(void)
+{
+    char *p, *q;
+    uint8_t deg = 0, min = 0;
+    float frac_min = 0;
+    int32_t ret = 0;
+    for (p = term; *p && isdigit((int)*p); p++) {
+        ;
+    }
+    q = term;
+    while ((p - q) > 2  && *q) {
+        if (deg)
+            deg *= 10;
+        deg += DIGIT_TO_VAL(*q++);
+    }
+    while (p > q && *q) {
+        if (min)
+            min *= 10;
+        min += DIGIT_TO_VAL(*q++);
+    }
+    if (*p == '.') {
+        q = p + 1;
+        float frac_scale = 0.1f;
+        while (*q && isdigit((int)*q)) {
+            frac_min += DIGIT_TO_VAL(*q) * frac_scale;
+            q ++;
+            frac_scale *= 0.1f;
+        }
+    }
+    ret = (deg * (int32_t)10000000UL);
+    ret += (min * (int32_t)10000000UL / 60);
+    ret += (int32_t)(frac_min * (1.0e7f / 60.0f));
+    return ret;
+}
 
 static bool have_new_message(void)
 {
@@ -211,7 +274,117 @@ static bool term_complete(void)
         }
         return false;
     }
-    return true;
+    if (term_number == 0) {
+        if (strcmp(term, "PHD") == 0) {
+            sentence_type = GPS_SENTENCE_PHD;
+            return false;
+        }
+        if (term[0] < 'A' || term[0] > 'Z' ||
+            term[1] < 'A' || term[1] > 'Z') {
+            sentence_type = GPS_SENTENCE_OTHER;
+            return false;
+        }
+        const char *term_type = &term[2];
+        if (strcmp(term_type, "RMC") == 0) {
+            sentence_type = GPS_SENTENCE_RMC;
+        } else if (strcmp(term_type, "GGA") == 0) {
+            sentence_type = GPS_SENTENCE_GGA;
+        } else if (strcmp(term_type, "HDT") == 0) {
+            sentence_type = GPS_SENTENCE_HDT;
+            gps_data_good = true;
+        } else if (strcmp(term_type, "THS") == 0) {
+            sentence_type = GPS_SENTENCE_THS;
+        } else if (strcmp(term_type, "VTG") == 0) {
+            sentence_type = GPS_SENTENCE_VTG;
+            gps_data_good = true;
+        } else {
+            sentence_type = GPS_SENTENCE_OTHER;
+        }
+        return false;
+    }
+    if (sentence_type != GPS_SENTENCE_OTHER && term[0]) {
+        switch (sentence_type + term_number) {
+            case GPS_SENTENCE_RMC + 2:
+                gps_data_good = term[0] == 'A';
+                break;
+            case GPS_SENTENCE_GGA + 6:
+                gps_data_good = term[0] > '0';
+                new_quality_indicator = term[0] - '0';
+                break;
+            case GPS_SENTENCE_THS + 2:
+                gps_data_good = term[0] == 'A';
+                break;
+            case GPS_SENTENCE_VTG + 9:
+                gps_data_good = term[0] != 'N';
+                break;
+            case GPS_SENTENCE_GGA + 7:
+                new_satellite_count = atol(term);
+                break;
+            case GPS_SENTENCE_GGA + 8:
+                new_hdop = (uint16_t)parse_decimal_100(term);
+                break;
+            case GPS_SENTENCE_RMC + 1:
+            case GPS_SENTENCE_GGA + 1:
+                new_time = parse_decimal_100(term);
+                break;
+            case GPS_SENTENCE_RMC + 9:
+                new_date = atol(term);
+                break;
+            case GPS_SENTENCE_RMC + 3:
+            case GPS_SENTENCE_GGA + 2:
+                new_latitude = parse_degrees();
+                break;
+            case GPS_SENTENCE_RMC + 4:
+            case GPS_SENTENCE_GGA + 3:
+                if (term[0] == 'S') {
+                    new_latitude = -new_latitude;
+                }
+                    break;
+            case GPS_SENTENCE_RMC + 5:
+            case GPS_SENTENCE_GGA + 4:
+                new_longitude = parse_degrees();
+                break;
+            case GPS_SENTENCE_RMC + 6:
+            case GPS_SENTENCE_GGA + 5:
+                if (term[0] == 'W') {
+                    new_longitude = -new_longitude;
+                }
+                break;
+            case GPS_SENTENCE_GGA + 9:
+                new_altitude = parse_decimal_100(term);
+                break;
+            case GPS_SENTENCE_RMC + 7:
+            case GPS_SENTENCE_VTG + 5:
+                new_speed = (parse_decimal_100(term) * 514) / 1000;
+                break;
+            case GPS_SENTENCE_HDT + 1:
+                new_gps_yaw = parse_decimal_100(term);
+                break;
+            case GPS_SENTENCE_THS + 1:
+                new_gps_yaw = parse_decimal_100(term);
+                break;
+            case GPS_SENTENCE_RMC + 8:
+            case GPS_SENTENCE_VTG + 1:
+                new_course = parse_decimal_100(term);
+                break;
+            case GPS_SENTENCE_PHD + 1:
+                phd.msg_class = atol(term);
+                break;
+            case GPS_SENTENCE_PHD + 2:
+                phd.msg_id = atol(term);
+                if (phd.msg_class == 1 && (phd.msg_id == 12 || phd.msg_id == 26)) {
+                    gps_data_good = true;
+                }
+                break;
+            case GPS_SENTENCE_PHD + 5:
+                phd.itow = strtoul(term, NULL, 10);
+                break;
+            case GPS_SENTENCE_PHD + 6 ... GPS_SENTENCE_PHD + 11:
+                phd.fields[term_number - 6] = atol(term);
+                break;
+        }
+    }
+    return false;
 }
 
 static bool decode(char c)

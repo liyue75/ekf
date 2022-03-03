@@ -1,9 +1,12 @@
 #include <string.h>
+#include "dal.h"
 #include "ekf3.h"
 #include "ekf3_core.h"
-#include "inertial_sensor.h"
+//#include "inertial_sensor.h"
+#include "ins_dal.h"
 #include "xtimer.h"
 #include "fusion_math.h"
+#include "location.h"
 
 #define ENABLE_DEBUG 1
 #include "debug.h"
@@ -40,7 +43,7 @@ int16_t _gps_vel_innov_gate = VEL_I_GATE_DEFAULT;
 float _gps_horiz_pos_noise = POSNE_M_NSE_DEFAULT;
 int16_t _gps_pos_innov_gate = POS_I_GATE_DEFAULT;
 int8_t _gps_glitch_radius_max = GLITCH_RADIUS_DEFAULT;
-float baro_alt_noise = ALT_M_NSE_DEFAULT;
+float _baro_alt_noise = ALT_M_NSE_DEFAULT;
 int16_t _hgt_innov_gate = HGT_I_GATE_DEFAULT;
 int16_t _hgt_delay_ms = 60;
 float _mag_noise = MAG_M_NSE_DEFAULT;
@@ -124,7 +127,7 @@ const uint32_t flow_interval_max_ms = 100;
 const float gnd_effect_baro_scaler = 4.0f;
 const uint8_t gnd_gradient_sigma = 50;
 const uint16_t fusion_time_step_ms = 10;
-const uint8_t sensor_interval_min_ms = 50;
+const uint8_t _sensor_interval_min_ms = 50;
 const uint8_t flow_interval_min_ms = 20;
 const uint8_t ext_nav_interval_min_ms = 20;
 const float max_yaw_est_vel_innov = 2.0f;
@@ -139,7 +142,8 @@ static bool ekf_enable;
 uint64_t _imu_sample_time_us;
 static uint32_t frame_time_usec;
 static uint8_t frames_per_prediction;
-static bool common_origin_valid;
+location_t common_ekf_origin;
+bool _common_origin_valid;
 static uint64_t core_last_time_primary_us;
 
 bool core_setup_required;
@@ -147,6 +151,8 @@ static float core_relative_errors;
 __attribute__((unused))static float core_error_scores;
 uint8_t core_imu_index;
 uint8_t num_cores;
+
+int16_t _mag_ef_limit;
 
 void set_ekf_enable(bool enable)
 {
@@ -168,12 +174,13 @@ bool ekf_initialise_filter(void)
     if (ekf_enable == 0) {
         return false;
     }
+    dal_start_frame();
     _imu_sample_time_us = xtimer_now64().ticks64;
-    const float loop_rate = get_ins_loop_rate_hz();
+    const float loop_rate = dal_ins_get_loop_rate_hz();
     if (!float_is_positive(loop_rate)) {
         return false;
     }
-    DEBUG("loop rate = %d\n", (int)loop_rate);
+    DEBUG("ins loop rate = %d\n", (int)loop_rate);
     frame_time_usec = 1e6 / loop_rate;
     frames_per_prediction = (uint8_t)(EKF_TARGET_DT / (frame_time_usec * 1.0e-6) + 0.5);
     DEBUG("frame per prediction = %d\n", frames_per_prediction);
@@ -188,11 +195,21 @@ bool ekf_initialise_filter(void)
         return false;
     }
     reset_core_errors();
-    common_origin_valid = false;
+    _common_origin_valid = false;
     bool ret = init_ekf3_core_filter_bootstrap();
     core_last_time_primary_us = 0;
     memset(&yaw_reset_data, 0, sizeof(yaw_reset_data));
     memset(&pos_reset_data, 0, sizeof(pos_reset_data));
     memset(&pos_down_reset_data, 0, sizeof(pos_down_reset_data));
     return ret;
+}
+
+bool ekf3_get_llh(location_t *loc)
+{
+    return ekf3_core_get_llh(loc);
+}
+
+void ekf3_reset_gyro_bias(void)
+{
+    ekf3_core_reset_gyro_bias();
 }

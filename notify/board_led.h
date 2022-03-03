@@ -6,6 +6,7 @@
 #define LED_1 GPIO_PIN(3, 1)
 #define LED_2 GPIO_PIN(3, 3)
 #define LED_3 GPIO_PIN(3, 5)
+#define IMU_CAL_SWITCH GPIO_PIN(3, 7)
 
 void board_led_init(void);
 void led_on(gpio_t pin_num);

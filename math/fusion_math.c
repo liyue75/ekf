@@ -30,15 +30,17 @@ inline bool float_is_positive(const float f)
     return f >= FLT_EPSILON;
 }
 
-float radians(float deg)
-{
-    /*
-#ifdef M_PI
-    DEBUG(" M_PI = %d", M_PI);
-#endif
-*/
-    return deg * DEG_TO_RAD;
-}
+/* float radians(float deg) */
+/* { */
+/*     /\* */
+/* #ifdef M_PI */
+/*     DEBUG(" M_PI = %d", M_PI); */
+/* #endif */
+/* *\/ */
+/*     return deg * DEG_TO_RAD; */
+/* } */
+
+
 
 uint8_t constrain_value(const uint8_t amt, const uint8_t low, const uint8_t high)
 {
@@ -79,6 +81,11 @@ float sq(const float v)
     return v*v;
 }
 
+float sq_2f(const float first, const float second)
+{
+    return sq(first) + sq(second);
+}
+
 float sq_3f(const float first, const float second, const float third)
 {
     return sq(first) + sq(second) + sq(third);
@@ -114,4 +121,9 @@ float wrap_360(const float angle)
         res += 360.0;
     }
     return res;
+}
+
+float norm_2f(const float first, const float second)
+{
+    return sqrtf(sq_2f(first, second));
 }

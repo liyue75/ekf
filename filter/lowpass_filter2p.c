@@ -38,9 +38,9 @@ void lpf2p_set_cutoff_frequency(float sample_freq, float cutoff_freq, biquad_t *
     if (!float_is_positive(biquad_filter->params.cutoff_freq)) {
         return;
     }
-    DEBUG("params->cutoff_freq = %d\nsample_freq = %d\n",
-          (int)biquad_filter->params.cutoff_freq,
-          (int)biquad_filter->params.sample_freq);
+    /* MY_LOG("params->cutoff_freq = %d\nsample_freq = %d\n", */
+    /*       (int)biquad_filter->params.cutoff_freq, */
+    /*       (int)biquad_filter->params.sample_freq); */
     float fr = sample_freq / cutoff_freq;
     float ohm = tanf(M_PI / fr);
     float c = 1.0f + 2.0f * cosf(M_PI / 4.0f) * ohm + ohm * ohm;
@@ -50,13 +50,13 @@ void lpf2p_set_cutoff_frequency(float sample_freq, float cutoff_freq, biquad_t *
     params->b2 = params->b0;
     params->a1 = 2.0f * (ohm * ohm - 1.0f) / c;
     params->a2 = (1.0f - 2.0f * cosf(M_PI / 4.0f) * ohm + ohm * ohm) / c;
-    DEBUG("b0 = %d, b1 = %d, b2 = %d, a1 = %d, a2 = %d\n",
-          (int)(biquad_filter->params.b0 * 1000),
-          (int)(params->b1 * 1000),
-          (int)(params->b2 * 1000),
-          (int)(biquad_filter->params.a1 * 1000),
-          (int)(params->a2 * 1000)
-    );
+    /* MY_LOG("b0 = %d, b1 = %d, b2 = %d, a1 = %d, a2 = %d\n", */
+    /*       (int)(biquad_filter->params.b0 * 1000), */
+    /*       (int)(params->b1 * 1000), */
+    /*       (int)(params->b2 * 1000), */
+    /*       (int)(biquad_filter->params.a1 * 1000), */
+    /*       (int)(params->a2 * 1000) */
+    /* ); */
 }
 
 vector3f_t lpf2p_v3f_apply(const vector3f_t *sample, biquad_t *biquad_filter)

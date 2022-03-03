@@ -1,12 +1,11 @@
 #ifndef MPU9250_PARAMS_H_
 #define MPU9250_PARAMS_H_
 
-#include "mpu9250.h"
-
 #ifdef __cplusplus__
 extern "C" {
 #endif
 
+#include "spi_device.h"
 #ifndef MPU9250_PARAM_SPI
 #define MPU9250_PARAM_SPI SPI_DEV(0)
 #endif

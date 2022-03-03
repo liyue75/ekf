@@ -41,8 +41,9 @@ static struct {
     lpf_v3f_t accel_lpf;
 } accum;
 
+bool _mpu9250_have_init = false;
 static uint32_t last_reset_ms;
-static uint8_t last_stat_user_ctrl;
+uint8_t _last_stat_user_ctrl;
 static bool enable_offset_checking;
 extern float _temp_zero;
 extern float _temp_sensitivity;
@@ -133,19 +134,19 @@ __attribute__((unused)) static bool mpu9250_hardware_init(void)
     //chip reset
     uint8_t tries;
     for (tries = 0; tries < 5; tries++) {
-        last_stat_user_ctrl = register_read(MPU9X50_USER_CTRL_REG);
-        DEBUG("last_stat_user_ctrl = 0x%x\n", last_stat_user_ctrl);
-        if (last_stat_user_ctrl & BIT_USER_CTRL_I2C_MST_EN) {
-            last_stat_user_ctrl &= ~BIT_USER_CTRL_I2C_MST_EN;
-            register_write(MPU9X50_USER_CTRL_REG, last_stat_user_ctrl);
+        _last_stat_user_ctrl = register_read(MPU9X50_USER_CTRL_REG);
+        DEBUG("_last_stat_user_ctrl = 0x%x\n", _last_stat_user_ctrl);
+        if (_last_stat_user_ctrl & BIT_USER_CTRL_I2C_MST_EN) {
+            _last_stat_user_ctrl &= ~BIT_USER_CTRL_I2C_MST_EN;
+            register_write(MPU9X50_USER_CTRL_REG, _last_stat_user_ctrl);
             xtimer_usleep(10000);
         }
         /* reset device */
         register_write(MPU9X50_PWR_MGMT_1_REG, BIT_PWR_MGMT_1_DEVICE_RESET);
         xtimer_usleep(100000);
         //mpu spi initialize
-        last_stat_user_ctrl |= BIT_USER_CTRL_I2C_IF_DIS;
-        register_write(MPU9X50_USER_CTRL_REG, last_stat_user_ctrl);
+        _last_stat_user_ctrl |= BIT_USER_CTRL_I2C_IF_DIS;
+        register_write(MPU9X50_USER_CTRL_REG, _last_stat_user_ctrl);
         //wake up device and select GyroZ clock
         register_write(MPU9X50_PWR_MGMT_1_REG, BIT_PWR_MGMT_1_CLK_ZGYRO);
         xtimer_usleep(5000);
@@ -162,7 +163,7 @@ __attribute__((unused)) static bool mpu9250_hardware_init(void)
     //register_write(MPU9X50_USER_CTRL_REG, 0x34);
     //xtimer_usleep(100000);
     //_ = register_read(MPU9X50_USER_CTRL_REG);
-    //DEBUG("after tries,  = 0x%x\n", last_stat_user_ctrl);
+    //DEBUG("after tries,  = 0x%x\n", _last_stat_user_ctrl);
     if (tries == 5) {
         DEBUG("failed to boot mpu9250 5 times\n");
         return false;
@@ -172,7 +173,7 @@ __attribute__((unused)) static bool mpu9250_hardware_init(void)
     return true;
 }
 
-bool sensor_init(void)
+bool mpu9250_init(void)
 {
     bool success = true;
     spi_init(_mpu9250_spi_params[0].spi);
@@ -183,6 +184,7 @@ bool sensor_init(void)
     }
     success = mpu9250_hardware_init();
     DEBUG("[mpu9250] hardware init: success = %d\n", success);
+    _mpu9250_have_init = true;
     return success;
 }
 
@@ -201,7 +203,7 @@ static void fifo_reset(void)
 {
     uint32_t now = xtimer_now().ticks32 / 1000;
     last_reset_ms = now;
-    uint8_t user_ctrl = last_stat_user_ctrl;
+    uint8_t user_ctrl = _last_stat_user_ctrl;
     user_ctrl &= ~(BIT_USER_CTRL_FIFO_RESET | BIT_USER_CTRL_FIFO_EN);
     __attribute__((unused))uint8_t val = register_read(MPU9X50_FIFO_EN_REG);
     //DEBUG("user_ctrl = 0x%x, fifo en reg = 0x%x\n", user_ctrl, val);
@@ -217,7 +219,7 @@ static void fifo_reset(void)
     xtimer_usleep(1000);
     val = register_read(MPU9X50_USER_CTRL_REG);
     //DEBUG("user ctrl reg = 0x%x\n", val);
-    last_stat_user_ctrl = user_ctrl | BIT_USER_CTRL_FIFO_EN;
+    _last_stat_user_ctrl = user_ctrl | BIT_USER_CTRL_FIFO_EN;
     notify_accel_fifo_reset();
     notify_gyro_fifo_reset();
 }
@@ -287,7 +289,7 @@ static bool accumulate_sensor_rate_sampling(uint8_t *samples, uint8_t n_samples)
         const uint8_t *data = samples + MPU_SAMPLE_SIZE * i;
         uint16_t t2 = int16_val(data, 3);
         if (!check_raw_temp(t2)) {
-            //MY_LOG("check_raw_temp error\n");
+            MY_LOG("check_raw_temp error\n");
             fifo_reset();
             ret = false;
             break;
@@ -378,7 +380,7 @@ static void poll_data(void)
         //MY_LOG("%d \n", ((uint16_t)rx[0] << 8) + rx[1]);
     }
     if (need_reset) {
-        MY_LOG("fifo reset");
+        //MY_LOG("fifo reset");
         fifo_reset();
     }
     checkreg_t reg;
@@ -386,12 +388,12 @@ check_registers:
     if (!check_next_register(&reg)) {
         gyro_error_count++;
         accel_error_count++;
-        led_on(LED_3);
+        //led_on(LED_3);
     }
     return;
 }
 
-void sensor_start(void)
+void imu_backend_start(void)
 {
     register_write(MPU9X50_PWR_MGMT_2_REG, 0x00);
     xtimer_usleep(1000);
@@ -442,4 +444,24 @@ void sensor_start(void)
     fifo_accel_scale = accel_scale / accel_fifo_downsample_rate;
     fifo_gyro_scale = gyro_scale / gyro_fifo_downsample_rate;
     register_periodic_callback(1000000 / gyro_backend_rate_hz, poll_data);
+}
+
+void configure_slaves(void)
+{
+    if (!(_last_stat_user_ctrl & BIT_USER_CTRL_I2C_MST_EN)) {
+        _last_stat_user_ctrl |= BIT_USER_CTRL_I2C_MST_EN;
+        register_write(MPU9X50_USER_CTRL_REG, _last_stat_user_ctrl);
+    }
+    register_write(MPU9X50_I2C_MST_REG, BIT_I2C_MST_P_NSR | BIT_I2C_MST_CLK_400KHZ);
+    register_write(MPU9X50_SLAVE4_CTRL_REG, 9);
+    register_write(MPU9X50_I2C_DELAY_CTRL_REG, BIT_I2C_SLV0_DLY_EN | BIT_I2C_SLV1_DLY_EN |
+                   BIT_I2C_SLV2_DLY_EN | BIT_I2C_SLV3_DLY_EN);
+}
+
+bool mpu9250_update(void)
+{
+    backend_update_accel();
+    backend_update_gyro();
+    backend_publish_temperature(_temp_filtered);
+    return true;
 }

@@ -1,4 +1,5 @@
 #include <math.h>
+#include <float.h>
 #include "vector3f.h"
 #include "uart_device.h"
 #include "board_led.h"
@@ -303,4 +304,10 @@ float v3f_length(const vector3f_t *v)
 vector3f_t v3f_normalized(const vector3f_t *v)
 {
     return v3f_div(v, v3f_length(v));
+}
+
+bool v3f_is_zero(vector3f_t *v)
+{
+    return (fabsf(v->x) < FLT_EPSILON) && (fabsf(v->y) < FLT_EPSILON)
+        && (fabsf(v->z) < FLT_EPSILON);
 }
