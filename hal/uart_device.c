@@ -7,14 +7,16 @@
 #define ENABLE_DEBUG (1)
 #include "debug.h"
 
-#define HAL_UART_TX_STACK_SIZE 512
+#define HAL_UART_TX_STACK_SIZE 2048
 #define HAL_UART_DEV UART_DEV(0)
-#define HAL_UART_BAUD 115200
+//#define HAL_UART_BAUD 115200
+#define HAL_UART_BAUD 921600
 #define HAL_UART_TX_THREAD_PRIORITY 11
+#define UART_TX_THREAD_STACKSIZE 3096
 
 static uint8_t console_tx_rb_buf[HAL_UART_TX_STACK_SIZE];
 uart_tx_pipe_t _console_tx_pipe;
-static char console_tx_thread_stack[THREAD_STACKSIZE_DEFAULT];
+static char console_tx_thread_stack[UART_TX_THREAD_STACKSIZE /* THREAD_STACKSIZE_DEFAULT */];
 
 static void *uart_tx_thread(__attribute__((unused))void *arg)
 {
@@ -66,7 +68,7 @@ static bool thread_tx_init(void)
                                      uart_tx_thread,
                                      NULL,
                                      "console_tx_thread");
-    DEBUG("uart tx pid = %d, prio = %d\n", pid, HAL_UART_TX_THREAD_PRIORITY);
+    DEBUG("\nuart tx pid = %d, prio = %d\n", pid, HAL_UART_TX_THREAD_PRIORITY);
     if (pid < 0) {
         DEBUG("Could not create UART TX thread\n");
         return false;

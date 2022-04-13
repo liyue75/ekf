@@ -18,7 +18,7 @@ void m3f_from_euler(matrix3f_t *m, float roll, float pitch, float yaw);
 
 void m3f_to_euler(const matrix3f_t *m, float *roll, float *pitch, float *yaw);
 
-matrix3f_t m3f_transpose(const matrix3f_t *m);
+matrix3f_t m3f_transposed(const matrix3f_t *m);
 
 void m3f_from_rotation(matrix3f_t *m, Rotation_t rotation);
 
@@ -26,7 +26,7 @@ vector3f_t m3f_to_euler312(const matrix3f_t *m);
 
 void m3f_from_euler312(matrix3f_t *m, float roll, float pitch, float yaw);
 
-void m3f_rotate(matrix3f_t *m, const vector3f_t g);
+void m3f_rotate(matrix3f_t *m, const vector3f_t *g);
 
 vector3f_t m3f_multi_v(const matrix3f_t *m, const vector3f_t *v);
 matrix3f_t m3f_multi_m(const matrix3f_t *m1, const matrix3f_t *m2);
@@ -41,5 +41,7 @@ bool m3f_invert(matrix3f_t *m);
 void m3f_zero(matrix3f_t *m);
 
 matrix3f_t m3f_from_axis_angle(const vector3f_t *v, float theta);
+void m3f_identity(matrix3f_t *m);
+vector3f_t m3f_colx(const matrix3f_t *m);
 
 #endif // MATRIX3F_H_

@@ -30,10 +30,13 @@ void *ekf_imu_buffer_get_offset(ekf_imu_buffer_t *b, uint8_t idx);
 uint32_t *ekf_ring_buffer_time_ms(ekf_ring_buffer_t *b, uint8_t idx);
 void ekf_ring_buffer_push(ekf_ring_buffer_t *b, const void *element);
 void ekf_ring_buffer_reset(ekf_ring_buffer_t *b);
-bool ekf_ring_buffer_recalll(ekf_ring_buffer_t *b, void *element, uint32_t sample_time);
+bool ekf_ring_buffer_recall(ekf_ring_buffer_t *b, void *element, uint32_t sample_time);
 void ekf_imu_buffer_push_youngest_element(ekf_imu_buffer_t *b, const void *element);
 void ekf_imu_buffer_get_oldest_element(ekf_imu_buffer_t *b, void *element);
 void ekf_imu_buffer_reset_history(ekf_imu_buffer_t *b, const void *element);
 void ekf_imu_buffer_reset(ekf_imu_buffer_t *b);
 void *ekf_imu_buffer_get(ekf_imu_buffer_t *b, uint8_t index);
+bool ekf_imu_buffer_is_filled(ekf_imu_buffer_t *b);
+uint8_t ekf_imu_buffer_get_youngest_index(ekf_imu_buffer_t *b);
+uint8_t ekf_imu_buffer_get_oldest_index(ekf_imu_buffer_t *b);
 #endif // EKF_BUFFER_H_

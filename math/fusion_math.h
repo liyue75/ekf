@@ -34,6 +34,7 @@ float sq_3f(const float first, const float second, const float third);
 float wrap_PI(const float radian);
 float wrap_2PI(const float radian);
 float wrap_360(const float angle);
+uint16_t get_random16(void);
 
 static inline float radians(float deg)
 {
@@ -44,5 +45,9 @@ static inline float degrees(float rad)
 {
     return rad * RAD_TO_DEG;
 }
+
+bool float_is_equal(const float v1, const float v2);
+float wrap_180(const float angle);
+float safe_sqrt(const float v);
 
 #endif // FUSION_MATH_H_

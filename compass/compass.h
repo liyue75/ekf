@@ -14,8 +14,8 @@
 #define COMPASS_MOT_COMP_PER_MOTOR 0x03
 
 #define COMPASS_CAL_ENABLED 1
-#define COMPASS_MOT_ENABLED 1
-#define COMPASS_LEARN_ENABLED 1
+#define COMPASS_MOT_ENABLED 0
+#define COMPASS_LEARN_ENABLED 0
 
 #define COMPASS_CALIBRATION_FITNESS_DEFAULT 16.0f
 #define COMPASS_MAX_XYZ_ANG_DIFF radians(90.0f)
@@ -77,7 +77,7 @@ COMPASS_LEARN_INFLIGHT = 3
 } compass_learn_type_t;
 
 void compass_init(void);
-
+bool compass_read(void);
 bool compass_healthy(void);
 bool compass_use_for_yaw(void);
 bool compass_have_scale_factor(void);
@@ -87,4 +87,10 @@ bool compass_consistent(void);
 vector3f_t *compass_get_field(void);
 uint32_t compass_last_update_usec(void);
 bool compass_available(void);
+bool compass_start_calibration(void);
+bool compass_is_calibrating(void);
+float compass_calculate_heading(const matrix3f_t *dcm_matrix);
+void compass_cal_update(void);
+vector3f_t compass_get_offsets(void);
+uint8_t compass_get_num_enabled(void);
 #endif // COMPASS_H_

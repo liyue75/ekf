@@ -40,5 +40,10 @@ typedef struct {
 } source_set_t;
 
 bool ekf_use_vel_z_source(source_z_t velz_source);
+bool ekf_have_vel_z_source(void);
+source_xy_t ekf_source_get_posxy_source(void);
+source_z_t ekf_source_get_posz_source(void);
+source_yaw_t ekf_source_get_yaw_source(void);
+bool ekf_source_use_vel_xy_source(source_xy_t velxy_source);
 
 #endif // EKF_COURCE_H_

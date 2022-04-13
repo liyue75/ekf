@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "vector3f.h"
+#include "ahrs.h"
 
 typedef struct {
     uint64_t time_us;
@@ -175,5 +176,11 @@ typedef struct {
 } log_rwoh_t;
 
 void dal_start_frame(void);
+bool dal_get_fly_forward(void);
+vehicle_class_t dal_get_vehicle_class(void);
+location_t *dal_get_home(void);
+bool dal_ekf_low_time_remaining(void);
+uint32_t dal_millis(void);
+uint64_t dal_micros64(void);
 
 #endif // DAL_H_

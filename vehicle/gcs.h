@@ -1,6 +1,8 @@
 #ifndef GCS_H_
 #define GCS_H_
 
+#include <stdbool.h>
+
 typedef enum {
 MAV_RESULT_ACCEPTED = 0,
 MAV_RESULT_TEMPORARILY_REJECTED = 1,
@@ -13,5 +15,6 @@ MAV_RESULT_ENUM_END = 7,
 } mav_result_t;
 
 void pre_calibration(void);
+bool is_mag_cal_testing(void);
 
 #endif // GCS_H_

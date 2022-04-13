@@ -43,9 +43,24 @@ typedef union {
     float a[ACCEL_CAL_MAX_NUM_PARAMS];
 } acal_cal_param_u;
 
+typedef enum {
+ACCELCAL_VEHICLE_POS_FAILED = 0,
+ACCELCAL_VEHICLE_POS_LEVEL = 1,
+ACCELCAL_VEHICLE_POS_LEFT = 2,
+ACCELCAL_VEHICLE_POS_RIGHT = 3,
+ACCELCAL_VEHICLE_POS_NOSEDOWN = 4,
+ACCELCAL_VEHICLE_POS_NOSEUP = 5,
+ACCELCAL_VEHICLE_POS_BACK = 6,
+ACCELCAL_VEHICLE_POS_SUCCESS = 7
+} accelcal_pos_t;
+
 void acal_cal_clear(void);
 accel_cal_status_t acal_cal_get_status(void);
 void acal_cal_new_sample(const vector3f_t* delta_velocity, float dt);
 void acal_cal_start(accel_cal_fit_type_t fit_type, uint8_t num_samples, float sample_time);
+void acal_cal_collect_sample(void);
+uint8_t acal_cal_get_num_samples_collected(void);
+void acal_cal_check_for_timeout(void);
+void acal_cal_get_calibration(vector3f_t *offset, vector3f_t *diag);
 
 #endif // ACCEL_CALIBRATOR_H_

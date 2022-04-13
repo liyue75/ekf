@@ -6,7 +6,7 @@ BOARD ?= stm32f4discovery
 
 # This has to be the absolute path to the RIOT base directory:
 RIOTBASE ?= $(CURDIR)/../..
-
+CFLAGS += -DTHREAD_STACKSIZE_MAIN=4096
 # gnrc
 # Include packages that pull up and auto-init the link layer.
 # NOTE: 6LoWPAN will be included if IEEE802.15.4 devices are present
@@ -16,8 +16,13 @@ USEMODULE += auto_init_gnrc_netif
 #USEMODULE += gnrc_icmpv6_error
 # Specify the mandatory networking modules for IPv6 and UDP
 #USEMODULE += gnrc_ipv6_router_default
+#USEMODULE += gnrc_sock_udp
 USEMODULE += gnrc_ipv6
-USEMODULE += gnrc_udp
+USEMODULE += gnrc_sock_udp
+USEMODULE += sock_udp
+USEMODULE += posix_sockets
+USEMODULE += posix_time
+USEMODULE += posix_inet
 # Add a routing protocol
 #USEMODULE += gnrc_rpl
 #USEMODULE += auto_init_gnrc_rpl
@@ -37,7 +42,7 @@ USEMODULE += ps
 USEMODULE += printf_float
 
 # w5100
-#USEMODULE += w5100
+USEMODULE += w5100
 CFLAGS += -DW5100_SPI_MODE
 ENC_SPI ?= SPI_DEV\(1\)
 ENC_CS ?= GPIO_PIN\(0,12\)
@@ -45,8 +50,8 @@ ENC_INT ?= GPIO_PIN\(0,11\)
 CFLAGS += -DW5100_PARAM_SPI=$(ENC_SPI)
 CFLAGS += -DW5100_PARAM_CS=$(ENC_CS)
 CFLAGS += -DW5100_PARAM_EVT=$(ENC_INT)
-#CFLAGS += -DW5100_PARAM_SPI_CLK=20000000
-
+CFLAGS += -DW5100_PARAM_SPI_CLK=20000000
+CFLAGS += -DPOSIX_SETSOCKOPT
 # DMA
 #FEATURES_REQUIRED += periph_dma
 

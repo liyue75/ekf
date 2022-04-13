@@ -10,6 +10,7 @@
 #include "fusion_math.h"
 #include "gps_backend.h"
 #include "common_nmea.h"
+#include "uart_device.h"
 
 #define DIGIT_TO_VAL(x) (x - '0')
 #define hexdigit(x) ((x)>9?'A'+((x) - 10):'0'+(x))
@@ -128,10 +129,10 @@ static bool have_new_message(void)
     now - last_GGA_ms > 150) {
         return false;
     }
-    if (last_VTG_ms != 0 &&
-    now - last_VTG_ms > 150) {
-        return false;
-    }
+    /* if (last_VTG_ms != 0 && */
+    /*     now - last_VTG_ms > 150) { */
+    /*     return false; */
+    /* } */
     if (last_PHD_12_ms != 0 &&
         now - last_PHD_12_ms > 150 &&
         now - last_PHD_12_ms < 1000) {
@@ -321,6 +322,7 @@ static bool term_complete(void)
                 new_satellite_count = atol(term);
                 break;
             case GPS_SENTENCE_GGA + 8:
+                //MY_LOG("**%s\n", term);
                 new_hdop = (uint16_t)parse_decimal_100(term);
                 break;
             case GPS_SENTENCE_RMC + 1:
@@ -352,6 +354,7 @@ static bool term_complete(void)
                 break;
             case GPS_SENTENCE_GGA + 9:
                 new_altitude = parse_decimal_100(term);
+                //MY_LOG("%ld\n", new_altitude);
                 break;
             case GPS_SENTENCE_RMC + 7:
             case GPS_SENTENCE_VTG + 5:
@@ -425,7 +428,7 @@ static bool decode(char c)
     if (!is_checksum_term) {
         parity ^= c;
     }
-    return true;
+    return valid_sentence;
 }
 
 bool gps_read(void)

@@ -257,9 +257,10 @@ float v3f_dot_product(const vector3f_t *v1, const vector3f_t *v2)
 
 vector3f_t v3f_cross_product(const vector3f_t *v1, const vector3f_t *v2)
 {
-    vector3f_t tmp = {v1->y * v2->z - v1->z * v2->y,
-         v1->z * v2->x - v1->x * v2->z,
-         v1->x * v2->y - v1->y * v2->x};
+    vector3f_t tmp = {
+    v1->y * v2->z - v1->z * v2->y,
+    v1->z * v2->x - v1->x * v2->z,
+    v1->x * v2->y - v1->y * v2->x};
     return tmp;
 }
 
@@ -286,6 +287,7 @@ vector3f_t v3f_sub(const vector3f_t *v1, const vector3f_t *v2)
     vector3f_t tmp = {v1->x - v2->x, v1->y - v2->y, v1->z - v2->z};
     return tmp;
 }
+
 bool v3f_isnan(const vector3f_t *v3f)
 {
     return isnan(v3f->x) || isnan(v3f->y) || isnan(v3f->z);
@@ -306,8 +308,13 @@ vector3f_t v3f_normalized(const vector3f_t *v)
     return v3f_div(v, v3f_length(v));
 }
 
-bool v3f_is_zero(vector3f_t *v)
+bool v3f_is_zero(const vector3f_t *v)
 {
     return (fabsf(v->x) < FLT_EPSILON) && (fabsf(v->y) < FLT_EPSILON)
         && (fabsf(v->z) < FLT_EPSILON);
+}
+
+bool v3f_not_equal(const vector3f_t *v1, const vector3f_t *v2)
+{
+    return (!float_is_equal(v1->x, v2->x)) || (!float_is_equal(v1->y, v2->y)) || (!float_is_equal(v1->z, v2->z));
 }

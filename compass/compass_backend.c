@@ -5,6 +5,7 @@
 #include "mutex.h"
 #include "xtimer.h"
 #include "compass_calibrator.h"
+#include "uart_device.h"
 
 static mutex_t compass_mutex;
 extern mag_state_t _compass_state[];
@@ -12,6 +13,7 @@ extern int8_t _filter_range;
 static float _mean_field_length;
 static const float FILTER_KOEF = 0.1f;
 static uint32_t error_count;
+extern bool compass_calibrator_inited;
 
 void compass_backend_init(void)
 {
@@ -20,8 +22,10 @@ void compass_backend_init(void)
 
 static void publish_raw_field(const vector3f_t *mag)
 {
-    _compass_state[0].last_update_ms = xtimer_now().ticks32 / 1000;
-    compass_calibrate_new_sample(mag);
+    if (compass_calibrator_inited) {
+        _compass_state[0].last_update_ms = xtimer_now().ticks32 / 1000;
+        compass_calibrator_new_sample(mag);
+    }
 }
 
 static bool field_ok(const vector3f_t *field)
@@ -42,6 +46,7 @@ static bool field_ok(const vector3f_t *field)
     const float d = fabsf(_mean_field_length - length) / (_mean_field_length + length);
     float koeff = FILTER_KOEF;
     if (d * 200.0f > range) {
+        MY_LOG("compass field length error: mean %f got %f\n", _mean_field_length, length);
         ret = false;
         koeff /= (d * 10.0f);
         error_count++;
@@ -104,9 +109,12 @@ void compass_drain_accumlated_sample(void)
     if (_compass_state[0].accum_count == 0) {
         return;
     }
-    _compass_state[0].accum = v3f_uniform_scale(
+    //MY_LOG("accum_count : %ld\n", _compass_state[0].accum_count);
+    _compass_state[0].accum = v3f_div(
         &_compass_state[0].accum, _compass_state[0].accum_count);
     publish_filtered_field(&_compass_state[0].accum);
+    /* MY_LOG("mag: %f %f %f\n", _compass_state[0].field.x, _compass_state[0].field.y, */
+    /*        _compass_state[0].field.z); */
     v3f_zero(&_compass_state[0].accum);
     _compass_state[0].accum_count = 0;
     mutex_unlock(&compass_mutex);

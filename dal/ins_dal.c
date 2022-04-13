@@ -3,6 +3,7 @@
 #include "vector3f.h"
 #include "inertial_sensor.h"
 #include "fusion_math.h"
+#include "uart_device.h"
 
 static log_rish_t rish = {.primary_gyro = 0, .primary_accel = 0, .accel_count = 1,
 .gyro_count = 1};
@@ -43,6 +44,8 @@ void dal_ins_start_frame(void)
     risi.use_gyro = get_gyro_health();
     if (risi.use_gyro) {
         risi.get_delta_velocity_ret = get_delta_angle(&risi.delta_angle, &risi.delta_angle_dt);
+        //MY_LOG("risi.delta_angle %f %f %f\n", risi.delta_angle.x,
+        //       risi.delta_angle.y, risi.delta_angle.z);
     }
     dal_ins_update_filtered();
 }
@@ -66,6 +69,7 @@ bool dal_ins_get_delta_velocity(vector3f_t *delta_velocity, float *delta_velocit
 
 bool dal_ins_get_delta_angle(vector3f_t *delta_angle, float *delta_angle_dt)
 {
+    //MY_LOG("ins dal delta angle: %f %f %f\n", risi.delta_angle.x, risi.delta_angle.y, risi.delta_angle.z);
     *delta_angle = risi.delta_angle;
     *delta_angle_dt = risi.delta_angle_dt;
     return risi.get_delta_angle_ret;

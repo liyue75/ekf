@@ -1,0 +1,12 @@
+struct GpsImuFusionData2
+{
+    long latitude;
+    long longitude;
+    long altitude;
+    float velocity_n;
+    float velocity_e;
+    float velocity_d;
+    float roll;
+    float pitch;
+    float yaw;
+};

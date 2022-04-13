@@ -4,6 +4,7 @@
 #include "fusion_math.h"
 #include "vector3f.h"
 #include "location.h"
+#include "uart_device.h"
 //#include "gps.h"
 #include "gps_dal.h"
 
@@ -47,6 +48,15 @@ extern uint32_t _gps_vel_innov_time_ms;
 extern float _vel_test_ratio;
 extern float _pos_test_ratio;
 extern float _hgt_test_ratio;
+extern bool _prev_on_ground;
+extern float _pos_down_at_takeoff;
+extern bool _mag_state_init_complete;
+extern float _pos_down_at_last_mag_reset;
+extern quaternionf_t _quat_at_last_mag_reset;
+extern float _yaw_innov_at_last_mag_reset;
+extern float _innov_yaw;
+extern state_var_t _s;
+extern bool _prev_in_flight;
 
 void ekf3_core_calc_gps_good_to_align(void)
 {
@@ -58,11 +68,14 @@ void ekf3_core_calc_gps_good_to_align(void)
     if (_gps_good_to_align) {
         check_scaler *= 1.3f;
     }
+    /* MY_LOG("mag test ratio: %f %f %f ,consistent_mag : %d\n", _mag_test_ratio.x, */
+    /*        _mag_test_ratio.y, _mag_test_ratio.z, _consistent_mag_data); */
     if ((_mag_test_ratio.x <= 1.0f && _mag_test_ratio.y <= 1.0f && _mag_test_ratio.z <= 1.0f) ||
     (!_consistent_mag_data)) {
         _mag_yaw_reset_timer_ms = _imu_sample_time_ms;
     }
     if ((_imu_sample_time_ms - _mag_yaw_reset_timer_ms > 5000) && !_motors_armed) {
+        MY_LOG("mag yaw reset request\n");
         _mag_yaw_reset_request = true;
         _mag_yaw_reset_timer_ms = _imu_sample_time_ms;
     }
@@ -79,6 +92,7 @@ void ekf3_core_calc_gps_good_to_align(void)
     bool gps_drift_fail = (_gps_drift_ne > 3.0f * check_scaler) && _on_ground &&
         (_gps_check & MASK_GPS_POS_DRIFT);
     if (gps_drift_fail) {
+        MY_LOG("GPS drift %.1fm (needs %.1f)\n", _gps_drift_ne, 3*check_scaler);
         _gps_check_status.bad_horiz_drift = true;
     } else {
         _gps_check_status.bad_horiz_drift = false;
@@ -93,15 +107,18 @@ void ekf3_core_calc_gps_good_to_align(void)
         gps_vert_vel_fail = false;
     }
     if (gps_vert_vel_fail) {
+        MY_LOG("GPS vertical speed %.2fm/s (needs %.2f)\n", _gps_vert_vel_filt, 0.3*check_scaler);
         _gps_check_status.bad_vert_vel = true;
     } else {
         _gps_check_status.bad_vert_vel = false;
     }
     bool gps_horiz_vel_fail = false;
     if (_on_ground) {
-        _gps_horiz_vel_filt = 0.1f * norm_2f(_gps_data_delayed.vel.x,
-                                             _gps_data_delayed.vel.y) + 0.9f * _gps_horiz_vel_filt;
+        _gps_horiz_vel_filt = 0.1f * norm_2f(_gps_data_new.vel.x,
+                                             _gps_data_new.vel.y) + 0.9f * _gps_horiz_vel_filt;
         _gps_horiz_vel_filt = constrain_float(_gps_horiz_vel_filt, -10.0f, 10.0f);
+        //MY_LOG("gps data delayed vel %f %f %f\n", _gps_data_delayed.vel.x, _gps_data_delayed.vel.y,
+        //       _gps_data_delayed.vel.z);
         gps_horiz_vel_fail = (fabsf(_gps_horiz_vel_filt) > 0.3f * check_scaler) && (
             _gps_check & MASK_GPS_HORIZ_SPD);
     }
@@ -133,18 +150,22 @@ void ekf3_core_calc_gps_good_to_align(void)
     bool gps_spd_acc_fail = (_gps_spd_accuracy > 1.0f * check_scaler) && (_gps_check &
                                                                           MASK_GPS_SPD_ERR);
     if (gps_spd_acc_fail) {
+        MY_LOG("GPS speed error %.1f (needs < %.1f)", _gps_spd_accuracy, check_scaler);
         _gps_check_status.bad_s_acc = true;
     } else {
         _gps_check_status.bad_s_acc = false;
     }
     bool hdop_fail = (dal_gps_get_hdop() > 250) && (_gps_check & MASK_GPS_HDOP);
+    //MY_LOG("hdop %d\n", dal_gps_get_hdop());
     if (hdop_fail) {
+        MY_LOG("GPS HDOP %.1f (needs 2.5)\n", 0.01*dal_gps_get_hdop());
         _gps_check_status.bad_hdop = true;
     } else {
         _gps_check_status.bad_hdop = false;
     }
     bool num_sats_fail = (dal_gps_num_sats() < 6) && (_gps_check & MASK_GPS_NSATS);
     if (num_sats_fail) {
+        MY_LOG("GPS numsats %d (needs 6)\n", dal_gps_num_sats());
         _gps_check_status.bad_sats = true;
     } else {
         _gps_check_status.bad_sats = false;
@@ -162,12 +183,15 @@ void ekf3_core_calc_gps_good_to_align(void)
         _gps_check_status.bad_yaw = false;
     }
     if (_last_gps_vel_fail_ms == 0) {
+        //MY_LOG("EKF starting GPS check\n");
         _last_gps_vel_fail_ms = _imu_sample_time_ms;
     }
     if (gps_spd_acc_fail || num_sats_fail || hdop_fail || h_acc_fail || v_acc_fail ||
     yaw_fail || gps_drift_fail || gps_vert_vel_fail || gps_horiz_vel_fail) {
+        //MY_LOG("gps fail\n");
         _last_gps_vel_fail_ms = _imu_sample_time_ms;
     } else {
+        //MY_LOG("gps pass\n");
         _last_gps_vel_pass_ms = _imu_sample_time_ms;
     }
     if (!_gps_good_to_align && _imu_sample_time_ms - _last_gps_vel_fail_ms > 10000) {
@@ -175,6 +199,7 @@ void ekf3_core_calc_gps_good_to_align(void)
     } else if (_gps_good_to_align && _imu_sample_time_ms - _last_gps_vel_pass_ms > 5000) {
         _gps_good_to_align = false;
     }
+    //MY_LOG("gps good to align %d\n", _gps_good_to_align);
 }
 
 void ekf3_core_calc_gps_good_for_flight(void)
@@ -195,6 +220,7 @@ void ekf3_core_calc_gps_good_for_flight(void)
                                             (1.0f - alpha1) * _s_acc_filter_state1),
                                            0.0f, 10.0f);
     _s_acc_filter_state2 = MAX(_s_acc_filter_state1, ((1.0f - alpha2) * _s_acc_filter_state2));
+//    MY_LOG("state 1 :%f state2 :%f\n", _s_acc_filter_state1, _s_acc_filter_state2);
     if (_s_acc_filter_state2 > 1.5f) {
         _gps_spd_acc_pass = false;
     } else if (_s_acc_filter_state2 < 1.0f) {
@@ -215,4 +241,19 @@ void ekf3_core_calc_gps_good_for_flight(void)
         _ekf_innovations_pass = true;
     }
     _gps_accuracy_good = _gps_spd_acc_pass && _ekf_innovations_pass;
+}
+
+void ekf3_core_detect_flight(void)
+{
+   if (_on_ground) {
+       _pos_down_at_takeoff = _s.state_struct.position.z;
+       if (_mag_state_init_complete) {
+           _pos_down_at_last_mag_reset = _s.state_struct.position.z;
+           _quat_at_last_mag_reset = _s.state_struct.quat;
+           _yaw_innov_at_last_mag_reset = _innov_yaw;
+       }
+   }
+   _prev_on_ground = _on_ground;
+   _prev_in_flight = _in_flight;
+   //MY_LOG("on_ground :%d, in_filght:%d\n", _on_ground, _in_flight); //on ground 1, inflight 0
 }

@@ -14,6 +14,10 @@
 #include "uart_device.h"
 #include "board_led.h"
 #include "accel_cal.h"
+
+#define ENABLE_DEBUG 1
+#include "debug.h"
+
 //#define IMU_LOOP_RATE_HZ 8000
 #define IMU_FAST_SAMPLING_RATE 0
 
@@ -89,6 +93,7 @@ void rotate_and_correct_accel(vector3f_t *accel, Rotation_t orientation)
     /*     update_accel_learning(accel, _temperature); */
     /* } */
     if (!_calibrating_accel && (!_acal_inited || !acal_running())) {
+        //led_on(LED_1);
         accel->x -= _accel_offset.x;
         accel->y -= _accel_offset.y;
         accel->z -= _accel_offset.z;
@@ -177,7 +182,6 @@ void notify_new_accel_raw_sample(__attribute__((unused))vector3f_t *accel,
         _delta_velocity_acc.y += accel->y * dt;
         _delta_velocity_acc.z += accel->z * dt;
         _delta_velocity_acc_dt += dt;
-
         _accel_filtered = lpf2p_v3f_apply(accel, &_accel_filter);
         if (v3f_isnan(&_accel_filtered) || v3f_isinf(&_accel_filtered)) {
             lpf2p_v3f_reset(&_accel_filter);
@@ -247,7 +251,6 @@ static void publish_accel(vector3f_t *accel)
         //rotate_inverse(_board_orientation);
         acal_cal_new_sample(&cal_sample, _delta_velocity_dt);
     }
-
 }
 
 void backend_update_accel(void)

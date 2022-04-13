@@ -4,6 +4,7 @@
 #include "fusion_math.h"
 #include "rotation.h"
 #include "board_led.h"
+#include "uart_device.h"
 
 #define ENABLE_DEBUG 1
 #include "debug.h"
@@ -374,6 +375,7 @@ void quat_normalize(quaternionf_t *q)
         q->q3 *= quat_mag_inv;
         q->q4 *= quat_mag_inv;
     } else {
+        MY_LOG("quat length is zero\n");
         //led_on(LED_3);
     }
 }
@@ -530,22 +532,22 @@ void quat_from_axis_angle(quaternionf_t *q, const vector3f_t *axis, float theta)
     q->q4 = axis->z * st2;
 }
 
-void quat_from_axis_angle_v3f(quaternionf_t *q, vector3f_t *v)
+void quat_from_axis_angle_v3f(quaternionf_t *q, vector3f_t v)
 {
-    const float theta = v3f_length(v);
+    const float theta = v3f_length(&v);
     if (float_is_zero(theta)) {
         q->q1 = 1.0f;
         q->q2 = q->q3 = q->q4 = 0.0f;
         return;
     }
-    *v = v3f_div(v, theta);
-    quat_from_axis_angle(q, v, theta);
+    v = v3f_div(&v, theta);
+    quat_from_axis_angle(q, &v, theta);
 }
 
 void quat_rotate_v(quaternionf_t *q, vector3f_t *v)
 {
     quaternionf_t r;
-    quat_from_axis_angle_v3f(&r, v);
+    quat_from_axis_angle_v3f(&r, *v);
     *q = quat_multi(q, &r);
 }
 
@@ -556,7 +558,7 @@ void quat_to_axis_angle(const quaternionf_t *q, vector3f_t *v)
     *v = tmp;
     if (!float_is_zero(l)) {
         *v = v3f_div(v, l);
-        *v = v3f_uniform_scale(v, wrap_PI(2.0f * atan2f(1, q->q1)));
+        *v = v3f_uniform_scale(v, wrap_PI(2.0f * atan2f(l, q->q1)));
     }
 }
 
@@ -636,4 +638,16 @@ vector3f_t quat_to_vector312(const quaternionf_t *q)
     matrix3f_t m;
     quat_to_rotation_matrix(q, &m);
     return m3f_to_euler312(&m);
+}
+
+void quat_initialise(quaternionf_t *q)
+{
+    q->q1 = 1;
+    q->q2 = q->q3 = q->q4 = 0;
+}
+
+float quat_idx(const quaternionf_t *q, uint8_t idx)
+{
+    const float *_v = &(q->q1);
+    return _v[idx];
 }

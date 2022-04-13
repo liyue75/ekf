@@ -81,6 +81,16 @@ float sq(const float v)
     return v*v;
 }
 
+float safe_sqrt(const float v)
+{
+    float ret = sqrtf(v);
+    if (isnan(ret)) {
+        return 0;
+    }
+    return ret;
+}
+
+
 float sq_2f(const float first, const float second)
 {
     return sq(first) + sq(second);
@@ -123,7 +133,31 @@ float wrap_360(const float angle)
     return res;
 }
 
+float wrap_180(const float angle)
+{
+    float res = wrap_360(angle);
+    if (res > (float)(180)) {
+        res -= (float)(180);
+    }
+    return res;
+}
+
+
 float norm_2f(const float first, const float second)
 {
     return sqrtf(sq_2f(first, second));
+}
+
+uint16_t get_random16(void)
+{
+    static uint32_t m_z = 1234;
+    static uint32_t m_w = 76542;
+    m_z = 36969 * (m_z & 0xFFFFu) + (m_z >> 16);
+    m_w = 18000 * (m_w & 0xFFFFu) + (m_w >> 16);
+    return ((m_z << 16) + m_w) & 0xFFFF;
+}
+
+bool float_is_equal(const float v1, const float v2)
+{
+    return fabsf(v1 - v2) < FLT_EPSILON;
 }

@@ -9,6 +9,7 @@
 #define GPS_UART_DEV UART_DEV(1)
 #define GPS_UART_BAUD 115200
 #define GPS_UART_RX_BUFFER_SIZE 512
+#define GPS_UNKNOWN_DOP UINT16_MAX
 
 typedef enum {
 GPS_TYPE_NONE = 0,
@@ -89,6 +90,18 @@ typedef struct {
     float average_delta_ms;
 } gps_timing_t;
 
+typedef struct {
+    uint8_t step;
+    uint8_t ck;
+} nmea_detect_state_t;
+
+typedef struct {
+    uint32_t last_baud_change_ms;
+    uint8_t current_baud;
+    bool auot_detected_baud;
+    nmea_detect_state_t nmea_detect_state;
+} detect_state_t;
+
 bool gps_get_lag(float *lag_sec);
 void gps_init(void);
 bool gps_read(void);
@@ -104,4 +117,8 @@ bool gps_vertical_accuracy(float *vacc);
 uint8_t gps_num_sats(void);
 uint16_t gps_get_hdop(void);
 location_t *gps_location(void);
+float gps_ground_speed(void);
+float gps_ground_course(void);
+uint32_t gps_last_fix_time_ms(void);
+void gps_update(void);
 #endif // GPS_H_

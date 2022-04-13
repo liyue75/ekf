@@ -2,7 +2,7 @@
 #include <math.h>
 #include "matrix3f.h"
 #include "fusion_math.h"
-
+//body to ned
 void m3f_from_euler(matrix3f_t *m, float roll, float pitch, float yaw)
 {
     const float cp = cosf(pitch);
@@ -35,12 +35,12 @@ void m3f_to_euler(const matrix3f_t *m, float *roll, float *pitch, float *yaw)
     }
 }
 
-matrix3f_t m3f_transpose(const matrix3f_t *m)
+matrix3f_t m3f_transposed(const matrix3f_t *m)
 {
     matrix3f_t temp = {
     {m->a.x, m->b.x, m->c.x},
     {m->a.y, m->b.y, m->c.y},
-    {m->a.z, m->b.z, m->c.x}
+    {m->a.z, m->b.z, m->c.z}
 };
     return temp;
 }
@@ -56,7 +56,7 @@ void m3f_from_rotation(matrix3f_t *m, Rotation_t rotation)
     rotate_vec(&m->a, rotation);
     rotate_vec(&m->b, rotation);
     rotate_vec(&m->c, rotation);
-    *m = m3f_transpose(m);
+    *m = m3f_transposed(m);
 }
 
 vector3f_t m3f_to_euler312(const matrix3f_t *m)
@@ -96,12 +96,12 @@ matrix3f_t m3f_add(const matrix3f_t *m1, const matrix3f_t *m2)
     return temp;
 }
 
-void m3f_rotate(matrix3f_t *m, const vector3f_t g)
+void m3f_rotate(matrix3f_t *m, const vector3f_t *g)
 {
     matrix3f_t temp = {
-    {m->a.y * g.z - m->a.z * g.y, m->a.z * g.x - m->a.x * g.z, m->a.x * g.y - m->a.y * g.x},
-    {m->b.y * g.z - m->b.z * g.y, m->b.z * g.x - m->b.x * g.z, m->b.x * g.y - m->b.y * g.x},
-    {m->c.y * g.z - m->c.z * g.y, m->c.z * g.x - m->c.x * g.z, m->c.x * g.y - m->c.y * g.x}
+    {m->a.y * g->z - m->a.z * g->y, m->a.z * g->x - m->a.x * g->z, m->a.x * g->y - m->a.y * g->x},
+    {m->b.y * g->z - m->b.z * g->y, m->b.z * g->x - m->b.x * g->z, m->b.x * g->y - m->b.y * g->x},
+    {m->c.y * g->z - m->c.z * g->y, m->c.z * g->x - m->c.x * g->z, m->c.x * g->y - m->c.y * g->x}
 };
     *m = m3f_add(m, &temp);
 }
@@ -221,5 +221,19 @@ matrix3f_t m3f_from_axis_angle(__attribute__((unused))const vector3f_t *v, float
                       {t * x * y + z * S, t * y * y + C, t * y * z - x * S},
                       {t * x * z - y * S, t * y * z + x * S, t * z * z + C}
 };
+    return tmp;
+}
+
+void m3f_identity(matrix3f_t *m)
+{
+    m->a.x = m->b.y = m->c.z = 1;
+    m->a.y = m->a.z = 0;
+    m->b.x = m->b.z = 0;
+    m->c.x = m->c.y = 0;
+}
+
+vector3f_t m3f_colx(const matrix3f_t *m)
+{
+    vector3f_t tmp = {m->a.x, m->b.x, m->c.x};
     return tmp;
 }

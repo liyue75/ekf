@@ -2,6 +2,7 @@
 #define QUATERNION_H_
 
 #include <stdbool.h>
+#include <stdint.h>
 #include "matrix3f.h"
 
 typedef struct quaternionf {
@@ -30,7 +31,7 @@ void quat_from_euler(quaternionf_t *q, const float roll, const float pitch, cons
 void quat_from_euler_v3f(quaternionf_t *q, const vector3f_t *v);
 void quat_from_vector312(quaternionf_t *q, const float roll, const float pitch, const float yaw);
 void quat_from_axis_angle(quaternionf_t *q, const vector3f_t *axis, float theta);
-void quat_from_axis_angle_v3f(quaternionf_t *q, vector3f_t *v);
+void quat_from_axis_angle_v3f(quaternionf_t *q, vector3f_t v);
 void quat_rotate_v(quaternionf_t *q, vector3f_t *v);
 void quat_to_axis_angle(const quaternionf_t *q, vector3f_t *v);
 void quat_from_axis_angle_fast(quaternionf_t *q, const vector3f_t *axis, float theta);
@@ -41,4 +42,6 @@ float quat_get_euler_pitch(const quaternionf_t *q);
 float quat_get_euler_yaw(const quaternionf_t *q);
 void quat_to_euler(const quaternionf_t *q, float *roll, float *pitch, float *yaw);
 vector3f_t quat_to_vector312(const quaternionf_t *q);
+void quat_initialise(quaternionf_t *q);
+float quat_idx(const quaternionf_t *q, uint8_t idx);
 #endif // QUATERNION_H_

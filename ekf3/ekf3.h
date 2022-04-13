@@ -5,6 +5,8 @@
 #include <stdint.h>
 #include "vector2f.h"
 #include "location.h"
+#include "vector3f.h"
+#include "matrix3f.h"
 
 #define MASK_GPS_NSATS (1<<0)
 #define MASK_GPS_HDOP (1<<1)
@@ -39,7 +41,12 @@ typedef struct {
 void set_ekf_enable(bool enable);
 
 void ekf3_init(void);
-bool ekf_initialise_filter(void);
+bool ekf3_initialise_filter(void);
 bool ekf3_get_llh(location_t *loc);
 void ekf3_reset_gyro_bias(void);
+bool ekf3_get_origin_llh(location_t *loc);
+void ekf3_update_filter(void);
+void ekf3_get_rotation_body_to_ned(matrix3f_t *mat);
+void ekf3_get_euler_angles(vector3f_t *euler);
+void ekf3_get_vel_ned(vector3f_t *vel);
 #endif // EKF3_H_

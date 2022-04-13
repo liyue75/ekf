@@ -13,6 +13,7 @@
 #include "uart_device.h"
 #include "accel_cal.h"
 #include "common.h"
+#include "ahrs.h"
 
 #define ENABLE_DEBUG 1
 #include "debug.h"
@@ -43,13 +44,17 @@ static float loop_delta_t_max;
 //extern bool _tcal_learning;
 uint32_t _accel_clip_count;
 
-bool _calibrating_accel;
-bool _calibrating_gyro;
+bool _calibrating_accel = false;
+bool _calibrating_gyro = false;
 bool _acal_inited = false;
 bool _accel_calibrator_inited = false;
 
-vector3f_t _accel_scale = {0, 0, 0};
-vector3f_t _accel_offset;
+//vector3f_t _accel_scale = {0, 0, 0};
+//vector3f_t _accel_offset = {0, 0, 0};
+//vector3f_t _accel_offset = {0.074430, -0.070392, 0.456529};
+//vector3f_t _accel_scale = {0.999245, 0.999748, 0.992788};
+vector3f_t _accel_offset = {0.080050, -0.073860, 0.529958};
+vector3f_t _accel_scale = {0.998848, 0.999873, 0.994849};
 vector3f_t _gyro_offset = {0, 0, 0};
 vector3f_t _accel_pos = {0, 0, 0};
 static float accel_max_abs_offsets;
@@ -135,7 +140,6 @@ bool inertial_sensor_init(void)
 {
     imu_backend_init();
     if (!_mpu9250_have_init) {
-        DEBUG("mpu 9250 haven't inited**************\n");
         if(!mpu9250_init())
             return false;
     }
@@ -154,12 +158,13 @@ static bool calibrating(void)
     return _calibrating_accel || _calibrating_gyro || (_acal_inited && acal_running());
 }
 
-static void wait_for_sample(void)
+void ins_wait_for_sample(void)
 {
     if (_have_sample) {
         return;
     }
     uint32_t now = xtimer_now().ticks32;
+    //DEBUG("now:%ld, next:%ld\n", now, _next_sample_usec);
     if (_next_sample_usec == 0 && _delta_time <= 0) {
         _last_sample_usec = now - _sample_period_usec;
         _next_sample_usec = now + _sample_period_usec;
@@ -196,7 +201,7 @@ check_sample:
 
 void ins_update(void)
 {
-    wait_for_sample();
+    ins_wait_for_sample();
     {
         _gyro_healthy = false;
         _accel_healthy = false;
@@ -253,7 +258,7 @@ static void _init_gyro(void)
     }
     _calibrating_gyro = true;
     led_on(LED_3);
-    DEBUG("init gyro ...\n\n");
+    //MY_LOG("init gyro ...\n\n");
     //board_orientation = ROTATION_NONE;
     v3f_zero(&_gyro_offset);
     v3f_zero(&new_gyro_offset);
@@ -273,13 +278,15 @@ static void _init_gyro(void)
         memset(&diff_norm, 0, sizeof(float));
         DEBUG("*\n");
         v3f_zero(&gyro_sum);
-        accel_start = *get_accel();
+        accel_start = get_accel();
         for (i = 0; i < 50; i++) {
             ins_update();
-            gyro_sum = v3f_add(&gyro_sum, get_gyro());
+            vector3f_t gyro_tmp = get_gyro();
+            gyro_sum = v3f_add(&gyro_sum, &gyro_tmp);
             xtimer_usleep(5000);
         }
-        vector3f_t accel_diff = v3f_sub(get_accel(), &accel_start);
+        vector3f_t tmp = get_accel();
+        vector3f_t accel_diff = v3f_sub(&tmp, &accel_start);
         if (v3f_length(&accel_diff) > 0.2f) {
             continue;
         }
@@ -308,24 +315,26 @@ static void _init_gyro(void)
         }
         last_average = gyro_avg;
     }
-    DEBUG("\n");
-    for (uint8_t i = 0; i < 3; i++) {
-        led_on(LED_3);
-        xtimer_usleep(100000);
-        led_off(LED_3);
-        xtimer_usleep(900000);
-    }
+    /* for (uint8_t i = 0; i < 3; i++) { */
+    /*     led_on(LED_3); */
+    /*     xtimer_usleep(100000); */
+    /*     led_off(LED_3); */
+    /*     xtimer_usleep(200000); */
+    /* } */
     if (!converged) {
-        DEBUG("gyro did not converge: diff = %f dps (expected < %f)\n",
+        MY_LOG("gyro did not converge: diff = %f dps (expected < %f)\n",
               ToDeg(best_diff), GYRO_INIT_MAX_DIFF_DPS);
         _gyro_offset = best_avg;
         gyro_cal_ok = false;
     } else {
-        DEBUG("gyro converge: offset = %f dps\n", v3f_length(&new_gyro_offset));
+        MY_LOG("gyro converge: offset = %f dps\ngyro offset: %f %f %f\n",
+               v3f_length(&new_gyro_offset),
+               new_gyro_offset.x, new_gyro_offset.y, new_gyro_offset.z);
         gyro_cal_ok = true;
         _gyro_offset = new_gyro_offset;
     }
     _calibrating_gyro = false;
+    led_off(LED_3);
 }
 
 static void _save_gyro_calibration(void)
@@ -455,16 +464,16 @@ float get_loop_delta_t(void)
     return _loop_delta_t;
 }
 
-vector3f_t* get_gyro(void)
+vector3f_t get_gyro(void)
 {
-    return &_gyro;
+    return _gyro;
 }
-vector3f_t* get_accel(void)
+vector3f_t get_accel(void)
 {
-    return &_accel;
+    return _accel;
 }
 
-static float get_delta_time(void)
+float ins_get_delta_time(void)
 {
     return MIN(_delta_time, loop_delta_t_max);
 }
@@ -478,21 +487,30 @@ bool get_gyro_health(void)
     return _gyro_healthy;
 }
 
+bool ins_healthy(void)
+{
+    return get_gyro_health() && get_accel_health();
+}
+
 bool get_delta_velocity(vector3f_t *delta_velocity, float *delta_velocity_dt)
 {
     if (_delta_velocity_valid) {
         *delta_velocity_dt = _delta_velocity_dt;
     } else {
-        *delta_velocity_dt = get_delta_time();
+        //MY_LOG("not valid\n");
+        *delta_velocity_dt = ins_get_delta_time();
     }
     *delta_velocity_dt = MIN(*delta_velocity_dt, loop_delta_t_max);
     if (_delta_velocity_valid) {
         *delta_velocity = _delta_velocity;
         return true;
     } else if (get_accel_health()) {
-        *delta_velocity = v3f_uniform_scale(get_accel(), get_delta_time());
+        //MY_LOG("health\n");
+        vector3f_t tmp = get_accel();
+        *delta_velocity = v3f_uniform_scale(&tmp, ins_get_delta_time());
         return true;
     }
+    //MY_LOG("false\n");
     return false;
 }
 
@@ -501,14 +519,15 @@ bool get_delta_angle(vector3f_t *delta_angle, float *delta_angle_dt)
     if (_delta_angle_valid && _delta_angle_dt > 0) {
         *delta_angle_dt = _delta_angle_dt;
     } else {
-        *delta_angle_dt = get_delta_time();
+        *delta_angle_dt = ins_get_delta_time();
     }
     *delta_angle_dt = MIN(*delta_angle_dt, loop_delta_t_max);
     if (_delta_angle_valid) {
         *delta_angle = _delta_angle;
         return true;
     } else if (get_gyro_health()) {
-        *delta_angle = v3f_uniform_scale(get_gyro(), get_delta_time());
+        vector3f_t tmp = get_gyro();
+        *delta_angle = v3f_uniform_scale(&tmp, ins_get_delta_time());
     }
     return false;
 }
@@ -546,4 +565,122 @@ void acal_init(void)
         _accel_calibrator.sample_buffer = NULL;
         acal_cal_clear();
     }
+}
+
+void ins_acal_update(void)
+{
+    if (!_acal_inited) {
+        return;
+    }
+    acal_handle_message();
+    acal_update();
+}
+
+void ins_acal_event_failure(void)
+{
+    vector3f_t tmp = {0, 0, 0};
+    _accel_offset = tmp;
+    vector3f_t tmp2 = {1, 1, 1};
+    _accel_scale = tmp2;
+}
+
+void ins_acal_save_calibrations(void)
+{
+    //MY_LOG("Acal save calibrations\n");
+    vector3f_t bias, gain;
+    if (acal_cal_get_status() == ACCEL_CAL_SUCCESS) {
+        acal_cal_get_calibration(&bias, &gain);
+        _accel_offset = bias;
+        _accel_scale = gain;
+        //sd_save();
+    }
+    MY_LOG("offset: %f %f %f\nbias: %f %f %f\n", _accel_offset.x,
+           _accel_offset.y, _accel_offset.z,
+           _accel_scale.x, _accel_scale.y,
+           _accel_scale.z);
+}
+
+float ins_get_gyro_drift_rate(void)
+{
+    return ToRad(0.5f / 60);
+}
+
+bool ins_simple_accel_cal(void)
+{
+    uint8_t num_accels = 1;
+    vector3f_t last_average;
+    vector3f_t new_accel_offset;
+    vector3f_t saved_offsets;
+    vector3f_t saved_scaling;
+    bool converged;
+    const float accel_convergence_limit = 0.05;
+    vector3f_t rotated_gravity = {0, 0, -GRAVITY_MSS};
+    if (calibrating()) {
+        MY_LOG("acal is already calibrated wrong\n");
+        return false;
+    }
+    _calibrating_accel = true;
+    saved_offsets = _accel_offset;
+    saved_scaling = _accel_scale;
+    _accel_offset.x = _accel_offset.y = _accel_offset.z = 0;
+    _accel_scale.x = _accel_scale.y = _accel_scale.z = 1;
+    v3f_zero(&new_accel_offset);
+    v3f_zero(&last_average);
+    converged = false;
+    for (uint8_t c = 0; c < 5; c++) {
+        xtimer_usleep(5000);
+        ins_update();
+    }
+    uint8_t num_converged = 0;
+    for (int16_t j = 0; j <= 10*4 && num_converged < num_accels ; j++) {
+        vector3f_t accel_sum, accel_avg, accel_diff;
+        float diff_norm;
+        uint8_t i;
+        diff_norm = 0;
+        DEBUG("*\n");
+        v3f_zero(&accel_sum);
+        for (i = 0; i < 50; i++) {
+            ins_update();
+            vector3f_t tmp = get_accel();
+            accel_sum = v3f_add(&accel_sum, &tmp);
+            xtimer_usleep(5000);
+        }
+        accel_avg = v3f_div(&accel_sum, i);
+        accel_diff = v3f_sub(&last_average, &accel_avg);
+        diff_norm = v3f_length(&accel_diff);
+        if (j > 0 && diff_norm < accel_convergence_limit) {
+            vector3f_t tmp1 = v3f_uniform_scale(&accel_avg, 0.5);
+            vector3f_t tmp2 = v3f_uniform_scale(&last_average, 0.5);
+            last_average = v3f_add(&tmp1, &tmp2);
+            if (!converged || v3f_length(&last_average) < v3f_length(&new_accel_offset)) {
+                new_accel_offset = last_average;
+            }
+            if (!converged) {
+                converged = true;
+                num_converged++;
+            }
+        } else {
+            last_average = accel_avg;
+        }
+    }
+    bool result = true;
+    if (!converged) {
+        result = false;
+    }
+    if (result == true) {
+        DEBUG("simple accel cal PASSED\n");
+        new_accel_offset = v3f_sub(&new_accel_offset, &rotated_gravity);
+        _accel_offset = new_accel_offset;
+    } else {
+        DEBUG("simple accel cal Failed\n");
+        _accel_offset = saved_offsets;
+        _accel_scale = saved_scaling;
+    }
+    _calibrating_accel = false;
+    uint32_t start_ms = xtimer_now().ticks32 / 1000;
+    while (xtimer_now().ticks32 / 1000 - start_ms < 500) {
+        ins_update();
+    }
+    ahrs_reset();
+    return result;
 }

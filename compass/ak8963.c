@@ -43,6 +43,7 @@ static float magnetometer_ASA[3] = {0, 0, 0};
 
 extern mag_state_t _compass_state[];
 uint8_t _compass_instance;
+extern uint8_t _compass_count;
 
 static void init_9250_aux_bus_slave(void)
 {
@@ -81,6 +82,7 @@ static bool calibrate(void)
     for (int i = 0; i < 3; i++) {
         float data = response[i];
         magnetometer_ASA[i] = ((data - 128) / 256 + 1);
+        MY_LOG("magnetometer_ASA[%d]: %f\n", i, magnetometer_ASA[i]);
     }
     return true;
 }
@@ -102,7 +104,7 @@ static bool register_compass(void)
     _compass_state[0].registered = true;
     _compass_state[0].priority = 0;
     _compass_instance = 0;
-    //compass_count = 1;
+    _compass_count = 1;
     return true;
 }
 
@@ -126,6 +128,10 @@ static void update(void )
         i2c_release(I2C_DEV(0));
         return;
     }
+    if (regs.st2 & 0x08) {
+        MY_LOG("Magnetic sensor overflow\n");
+        return;
+    }
     i2c_release(I2C_DEV(0));
     vector3f_t raw_field = {regs.val[0], regs.val[1], regs.val[2]};
     if (float_is_zero(raw_field.x) && float_is_zero(raw_field.y) &&
@@ -137,7 +143,7 @@ static void update(void )
     raw_field.z *= magnetometer_ASA[2];
     raw_field = v3f_uniform_scale(&raw_field, ADC_16BIT_RESOLUTION * AK8963_MILLIGAUSS_SCALE);
     compass_accumulate_sample(&raw_field, 10);
-    //MY_LOG("%d %d %d\n", (int)raw_field.x, (int)raw_field.y, (int)raw_field.z);
+    //MY_LOG("mag raw_field: %d %d %d\n", (int)raw_field.x, (int)raw_field.y, (int)raw_field.z);
 }
 
 static bool ak8963_init(void)

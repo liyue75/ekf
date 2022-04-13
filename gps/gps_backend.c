@@ -5,6 +5,7 @@
 #include "definitions.h"
 #include "uart_device.h"
 #include "fusion_math.h"
+#include "ringbuffer.h"
 
 uint32_t _last_itow;
 uint64_t _pseudo_itow;
@@ -45,10 +46,11 @@ uint16_t _rate_counter;
 /*     return epoch; */
 /* } */
 extern gps_status_t _gps_state;
+extern ringbuffer_t gps_buffer;
 
 void set_uart_timestamp(uint16_t nbytes)
 {
-    _gps_state.uart_timestamp_ms = receive_time_constraint_us(nbytes) / 1000U;
+    _gps_state.uart_timestamp_ms = (uint32_t)receive_time_constraint_us(nbytes) / 1000U;
 }
 
 void make_gps_time(uint32_t bcd_date, uint32_t bcd_milliseconds)

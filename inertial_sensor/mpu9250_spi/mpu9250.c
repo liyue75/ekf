@@ -112,14 +112,14 @@ static void register_write_check(uint8_t reg, uint8_t val)
 static bool check_whoami(void)
 {
     uint8_t whoami = register_read(MPU9X50_WHO_AM_I_REG);
-    DEBUG("whoami = 0x%x\n", whoami);
+    //DEBUG("whoami = 0x%x\n", whoami);
     if (whoami == MPU_WHOAMI_MPU9250) {
         return true;
     }
     return false;
 }
 
-__attribute__((unused)) static bool mpu9250_hardware_init(void)
+static bool mpu9250_hardware_init(void)
 {
     if (!check_whoami()) {
         return false;
@@ -135,7 +135,7 @@ __attribute__((unused)) static bool mpu9250_hardware_init(void)
     uint8_t tries;
     for (tries = 0; tries < 5; tries++) {
         _last_stat_user_ctrl = register_read(MPU9X50_USER_CTRL_REG);
-        DEBUG("_last_stat_user_ctrl = 0x%x\n", _last_stat_user_ctrl);
+        //DEBUG("_last_stat_user_ctrl = 0x%x\n", _last_stat_user_ctrl); //0x50
         if (_last_stat_user_ctrl & BIT_USER_CTRL_I2C_MST_EN) {
             _last_stat_user_ctrl &= ~BIT_USER_CTRL_I2C_MST_EN;
             register_write(MPU9X50_USER_CTRL_REG, _last_stat_user_ctrl);
@@ -151,7 +151,7 @@ __attribute__((unused)) static bool mpu9250_hardware_init(void)
         register_write(MPU9X50_PWR_MGMT_1_REG, BIT_PWR_MGMT_1_CLK_ZGYRO);
         xtimer_usleep(5000);
         if (register_read(MPU9X50_PWR_MGMT_1_REG) == BIT_PWR_MGMT_1_CLK_ZGYRO) {
-            DEBUG(" pll clock selected\n");
+            //DEBUG(" pll clock selected\n");
             break;
         }
         xtimer_usleep(10000);
@@ -183,11 +183,10 @@ bool mpu9250_init(void)
         return false;
     }
     success = mpu9250_hardware_init();
-    DEBUG("[mpu9250] hardware init: success = %d\n", success);
+    //DEBUG("[mpu9250] hardware init: success = %d\n", success);
     _mpu9250_have_init = true;
     return success;
 }
-
 
 static void set_accel_raw_sample_rate(uint16_t rate_hz)
 {
@@ -205,11 +204,11 @@ static void fifo_reset(void)
     last_reset_ms = now;
     uint8_t user_ctrl = _last_stat_user_ctrl;
     user_ctrl &= ~(BIT_USER_CTRL_FIFO_RESET | BIT_USER_CTRL_FIFO_EN);
-    __attribute__((unused))uint8_t val = register_read(MPU9X50_FIFO_EN_REG);
+    //__attribute__((unused))uint8_t val = register_read(MPU9X50_FIFO_EN_REG);
     //DEBUG("user_ctrl = 0x%x, fifo en reg = 0x%x\n", user_ctrl, val);
     register_write(MPU9X50_FIFO_EN_REG, 0);
-    xtimer_usleep(1000);
-    val = register_read(MPU9X50_FIFO_EN_REG);
+    //xtimer_usleep(1000);
+    //val = register_read(MPU9X50_FIFO_EN_REG);
     //DEBUG("after write: fifo en reg = 0x%x\n", val);
     register_write(MPU9X50_USER_CTRL_REG, user_ctrl);
     register_write(MPU9X50_USER_CTRL_REG, user_ctrl | BIT_USER_CTRL_FIFO_RESET);
@@ -217,7 +216,7 @@ static void fifo_reset(void)
     register_write(MPU9X50_FIFO_EN_REG, BIT_XG_FIFO_EN | BIT_YG_FIFO_EN |
                    BIT_ZG_FIFO_EN | BIT_ACCEL_FIFO_EN | BIT_TEMP_FIFO_EN);
     xtimer_usleep(1000);
-    val = register_read(MPU9X50_USER_CTRL_REG);
+    //val = register_read(MPU9X50_USER_CTRL_REG);
     //DEBUG("user ctrl reg = 0x%x\n", val);
     _last_stat_user_ctrl = user_ctrl | BIT_USER_CTRL_FIFO_EN;
     notify_accel_fifo_reset();
@@ -246,13 +245,13 @@ static void set_filter_register(void)
 
         init_lpf_v3f(&accum.accel_lpf);
         set_cutoff_freq_v3f_sam(4000, 188, &accum.accel_lpf);
-        DEBUG("accel down sample = %d, backend rate = %d, \
-              gyro down sample = %d, backend = %d\n", accel_fifo_downsample_rate,
+        DEBUG("accel downsample: %d, rate: %d, gyro downsample: %d, rate: %d\n",
+              accel_fifo_downsample_rate,
               accel_backend_rate_hz, gyro_fifo_downsample_rate, gyro_backend_rate_hz);
 
-        DEBUG("accum.gyro_count = %d, gyro_to_accel_sample_ratio = %d, a\\g = %d\n",
-              accum.gyro_count,  gyro_to_accel_sample_ratio,
-              accum.gyro_count % gyro_to_accel_sample_ratio);
+        /* DEBUG("accum.gyro_count = %d, gyro_to_accel_sample_ratio = %d, a\\g = %d\n", */
+        /*       accum.gyro_count,  gyro_to_accel_sample_ratio, */
+        /*       accum.gyro_count % gyro_to_accel_sample_ratio); */
         set_accel_oversampling(accel_fifo_downsample_rate);
         set_gyro_oversampling(gyro_fifo_downsample_rate);
         accel_sensor_rate_sampling_enabled = true;
@@ -278,6 +277,10 @@ __attribute__((unused))static bool check_raw_temp(__attribute__((unused))int16_t
     MY_LOG("raw temp= %d, t2 = %d\n", raw_temp, t2);
     return (abs(t2 - raw_temp) < 800);
 }
+
+/* static int8_t tcount = 0; */
+/* extern vector3f_t _delta_velocity_acc; */
+/* extern float _delta_velocity_acc_dt; */
 
 static bool accumulate_sensor_rate_sampling(uint8_t *samples, uint8_t n_samples)
 {
@@ -314,6 +317,14 @@ static bool accumulate_sensor_rate_sampling(uint8_t *samples, uint8_t n_samples)
                 accum.accel.z *= fifo_accel_scale;
                 rotate_and_correct_accel(&accum.accel, accel_orientation);
                 notify_new_accel_raw_sample(&accum.accel, 0, false);
+                /* tcount++; */
+                /* if (tcount == 100) { */
+                /*     tcount = 0; */
+                /*     MY_LOG("v: %ld %ld %ld, dt: %ld\n", (int32_t)(_delta_velocity_acc.x * 10000), */
+                /*            (int32_t)(_delta_velocity_acc.y * 10000), */
+                /*            (int32_t)(_delta_velocity_acc.z * 10000), */
+                /*            (int32_t)(_delta_velocity_acc_dt * 10000)); */
+                /* } */
                 accum.accel.x = accum.accel.y = accum.accel.z = 0;
                 accum.accel_count = 0;
                 accum.gyro_count = 0;
@@ -397,8 +408,8 @@ void imu_backend_start(void)
 {
     register_write(MPU9X50_PWR_MGMT_2_REG, 0x00);
     xtimer_usleep(1000);
-    uint8_t val = register_read(MPU9X50_PWR_MGMT_2_REG);
-    DEBUG("mgmt 2 pwr val = 0x%x\n", val);
+    //uint8_t val = register_read(MPU9X50_PWR_MGMT_2_REG);
+    //DEBUG("mgmt 2 pwr val = 0x%x\n", val);
     fifo_reset();
     enable_offset_checking = true;
     if (!register_gyro(1000) || !register_accel(1000)) {
@@ -419,12 +430,12 @@ void imu_backend_start(void)
     gyro_scale = (radians(1) / 16.4f);
     xtimer_usleep(1000);
     // configure interrupt to fire when new data arrives
-    uint8_t int_reg = register_read(MPU9X50_INT_ENABLE_REG);
-    DEBUG("int_reg = 0x%x\n", int_reg);
+    //uint8_t int_reg = register_read(MPU9X50_INT_ENABLE_REG);
+    //DEBUG("int_reg = 0x%x\n", int_reg);
     register_write(MPU9X50_INT_ENABLE_REG, BIT_RAW_RDY_EN);
     xtimer_usleep(1000);
     uint8_t v = register_read(MPU9X50_INT_PIN_CFG_REG);
-    DEBUG("int pin cfg reg = 0x%x\n", v);
+    //DEBUG("int pin cfg reg = 0x%x\n", v);
     v |=  BIT_INT_RD_CLEAR | BIT_LATCH_INT_EN;
     v &= BIT_BYPASS_EN;
     register_write(MPU9X50_INT_PIN_CFG_REG, v);

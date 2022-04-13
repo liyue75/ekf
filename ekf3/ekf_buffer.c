@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "ekf_buffer.h"
+#include "uart_device.h"
 
 bool init_ekf_ring_buffer(ekf_ring_buffer_t *b, uint8_t elsize, uint8_t size)
 {
@@ -69,7 +70,7 @@ void ekf_ring_buffer_reset(ekf_ring_buffer_t *b)
     memset(b->buffer, 0, b->_size * (uint32_t)b->elsize);
 }
 
-bool ekf_ring_buffer_recalll(ekf_ring_buffer_t *b, void *element, uint32_t sample_time)
+bool ekf_ring_buffer_recall(ekf_ring_buffer_t *b, void *element, uint32_t sample_time)
 {
     if (!b->_new_data) {
         return false;
@@ -77,6 +78,18 @@ bool ekf_ring_buffer_recalll(ekf_ring_buffer_t *b, void *element, uint32_t sampl
     bool success = false;
     uint8_t tail = b->_tail;
     uint8_t best_index;
+    while (b->_head != tail) {
+        if (*ekf_ring_buffer_time_ms(b, tail) != 0 &&
+            *ekf_ring_buffer_time_ms(b, tail) <= sample_time) {
+            if ((sample_time - *ekf_ring_buffer_time_ms(b, tail)) < 100) {
+                best_index = tail;
+                success = true;
+            }
+        } else if (*ekf_ring_buffer_time_ms(b, tail) > sample_time) {
+            break;
+        }
+        tail = (tail + 1) % b->_size;
+    }
     if (b->_head == tail) {
         if (*ekf_ring_buffer_time_ms(b, tail) != 0 &&
             *ekf_ring_buffer_time_ms(b, tail) <= sample_time) {
@@ -85,19 +98,6 @@ bool ekf_ring_buffer_recalll(ekf_ring_buffer_t *b, void *element, uint32_t sampl
                 success = true;
                 b->_new_data = false;
             }
-        }
-    } else {
-        while (b->_head != tail) {
-            if (*ekf_ring_buffer_time_ms(b, tail) != 0 &&
-                *ekf_ring_buffer_time_ms(b, tail) <= sample_time) {
-                if ((sample_time - *ekf_ring_buffer_time_ms(b, tail)) < 100) {
-                    best_index = tail;
-                    success = true;
-                }
-            } else if (*ekf_ring_buffer_time_ms(b, tail) > sample_time) {
-                break;
-            }
-            tail = (tail + 1) % b->_size;
         }
     }
     if (!success) {
@@ -111,12 +111,16 @@ bool ekf_ring_buffer_recalll(ekf_ring_buffer_t *b, void *element, uint32_t sampl
 
 void ekf_imu_buffer_push_youngest_element(ekf_imu_buffer_t *b, const void *element)
 {
+
     if (b->buffer == NULL) {
+        MY_LOG("imu buffer null\n");
         return;
     }
     b->_youngest = (b->_youngest + 1) % b->_size;
     memcpy(ekf_imu_buffer_get_offset(b, b->_youngest), element, b->elsize);
     b->_oldest = (b->_youngest + 1) % b->_size;
+    /* MY_LOG("push younest element, youngest: %d oldest: %d, size:%d\n", */
+    /*        b->_youngest, b->_oldest, b->_size); */
     if (b->_oldest == 0) {
         b->_filled = true;
     }
@@ -148,4 +152,19 @@ void ekf_imu_buffer_reset(ekf_imu_buffer_t *b)
 void *ekf_imu_buffer_get(ekf_imu_buffer_t *b, uint8_t index)
 {
     return ekf_imu_buffer_get_offset(b, index);
+}
+
+bool ekf_imu_buffer_is_filled(ekf_imu_buffer_t *b)
+{
+    return b->_filled;
+}
+
+uint8_t ekf_imu_buffer_get_oldest_index(ekf_imu_buffer_t *b)
+{
+    return b->_oldest;
+}
+
+uint8_t ekf_imu_buffer_get_youngest_index(ekf_imu_buffer_t *b)
+{
+    return b->_youngest;
 }

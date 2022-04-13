@@ -2,8 +2,9 @@
 #include <stdio.h>
 #include "net/netif.h"
 #include "microdds.h"
+#include "uart_device.h"
 
-#define ENABLE_DEBUG        (0)
+#define ENABLE_DEBUG  1
 #include "debug.h"
 
 static uint32_t get_mac_key(void)
@@ -30,13 +31,14 @@ int microdds_init(const microdds_init_arg_t *args)
     strcpy(port, args->agent_port);
     //uint16_t domain = args->participant_domain;
     uint16_t domain = 1;
+    //DEBUG("init udp transport\n");
     if(!uxr_init_udp_transport(&ses.transport, UXR_IPv6, ip, port))
     {
         DEBUG("Error at create transport.\n");
         uxr_close_udp_transport(&ses.transport);
         return MICRODDS_ER_INIT_UDP;
     }
-
+    //DEBUG("init senssion\n");
     uint32_t key = get_mac_key();
     // Session
     uxr_init_session(&ses.session, &ses.transport.comm, key);
@@ -52,7 +54,7 @@ int microdds_init(const microdds_init_arg_t *args)
     ses.best_effort_in = uxr_create_input_best_effort_stream(&ses.session);
     ses.reliable_out = uxr_create_output_reliable_stream(&ses.session, ses.reliable_buffer_out, 2048, 2);
     ses.reliable_in = uxr_create_input_reliable_stream(&ses.session, ses.reliable_buffer_in, 2048, 2);
-
+    //DEBUG("create par\n");
     ses.participant_id = uxr_object_id(1, UXR_PARTICIPANT_ID);
     const char* participant_xml = "<dds>"
                                   "<profiles>"
@@ -88,7 +90,7 @@ int microdds_init(const microdds_init_arg_t *args)
     uint8_t status[3];
     uint16_t requests[3] = {participant_req, publisher_req, subscriber_req};
 
-
+    //DEBUG("run session\n");
     if(!uxr_run_session_until_all_status(&ses.session, 1000, requests, status, 3))
     {
         DEBUG("Error at create entities: participant: %i publisher: %i subscriber: %i\n", status[0], status[1], status[2]);
@@ -128,7 +130,7 @@ int microdds_create_topic(const microdds_topic_t *topic)
 int microdds_create_writer(uint16_t writer_id, const microdds_topic_t *topic)
 {
      if(ses.have_init == false) {
-        DEBUG("dds_ses haven't init");
+        DEBUG("dds_ses haven't init\n");
         return MICRODDS_NOT_INIT;
     }
     uxrObjectId datawriter_id = uxr_object_id(writer_id, UXR_DATAWRITER_ID);
@@ -211,7 +213,7 @@ int microdds_create_reader(uint16_t reader_id, const microdds_topic_t * topic, c
 int microdds_pub(void)
 {
      if(ses.have_init == false) {
-        DEBUG("dds_ses haven't init");
+        MY_LOG("dds_ses haven't init\n");
         return MICRODDS_NOT_INIT;
     } else {
         uxr_flash_output_streams(&ses.session);
@@ -225,7 +227,7 @@ int microdds_pub(void)
 int microdds_listen(uint32_t timeout, bool mode)
 {
     if(ses.have_init == false) {
-        DEBUG("dds_ses haven't init");
+        DEBUG("dds_ses haven't init\n");
         return MICRODDS_NOT_INIT;
     }
     bool ret = false;
@@ -244,7 +246,7 @@ int microdds_listen(uint32_t timeout, bool mode)
 int microdds_close(void)
 {
      if(ses.have_init == false) {
-        DEBUG("dds_ses haven't init");
+        DEBUG("dds_ses haven't init\n");
         return MICRODDS_NOT_INIT;
     } else {
         uxr_delete_session(&ses.session);

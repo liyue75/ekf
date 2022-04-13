@@ -6,12 +6,24 @@
 #include "uart_device.h"
 #include "xtimer.h"
 #include "accel_cal.h"
+#include "compass_calibrator.h"
 
 #define ENABLE_DEBUG 1
 #include "debug.h"
 
+static bool mag_cal_test = false;
+
+bool is_mag_cal_testing(void)
+{
+    return mag_cal_test;
+}
+
 static mav_result_t mag_cal(void)
 {
+    //compass_calibrator_init();
+    /* if(!compass_start_calibration()) { */
+    /*     return MAV_RESULT_FAILED; */
+    /* } */
     return MAV_RESULT_ACCEPTED;
 }
 
@@ -37,6 +49,7 @@ static mav_result_t accel_cal(void)
 
 static mav_result_t simple_accel_cal(void)
 {
+    //ins_simple_accel_cal(); //do not use simple accel cal because it is not accuracy
     return MAV_RESULT_ACCEPTED;
 }
 
@@ -46,11 +59,13 @@ void pre_calibration(void)
         led_on(LED_2);
         accel_cal();
         mag_cal();
-        DEBUG("calibrate finished, need restart\n");
+        led_off(LED_2);
     } else {
         led_on(LED_2);
         simple_accel_cal();
+//        mag_cal_test = true;
         xtimer_sleep(1);
         led_off(LED_2);
+        set_fly_forward(true);
     }
 }

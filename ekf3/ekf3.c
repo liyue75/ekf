@@ -7,19 +7,26 @@
 #include "xtimer.h"
 #include "fusion_math.h"
 #include "location.h"
+#include "uart_device.h"
 
 #define ENABLE_DEBUG 1
 #include "debug.h"
 
 #define VELNE_M_NSE_DEFAULT 0.5f
+//#define VELNE_M_NSE_DEFAULT 1.0f
 #define VELD_M_NSE_DEFAULT 0.7f
+//#define VELD_M_NSE_DEFAULT 2.5f
 #define POSNE_M_NSE_DEFAULT 0.5f
+//#define POSNE_M_NSE_DEFAULT 1.5f
 #define ALT_M_NSE_DEFAULT 2.0f
+//#define ALT_M_NSE_DEFAULT 5.0f
 #define MAG_M_NSE_DEFAULT 0.05f
 #define GYRO_P_NSE_DEFAULT 1.5e-02f
 #define ACC_P_NSE_DEFAULT 3.5E-01f
+//#define ACC_P_NSE_DEFAULT 5.0E-01f
 #define GBIAS_P_NSE_DEFAULT 1.0E-03f
 #define ABIAS_P_NSE_DEFAULT 3.0E-03f
+//#define ABIAS_P_NSE_DEFAULT 3.0E-2F
 #define MAGB_P_NSE_DEFAULT 1.0E-04f
 #define MAGE_P_NSE_DEFAULT 1.0E-03f
 #define VEL_I_GATE_DEFAULT 500
@@ -101,20 +108,20 @@ float _ognm_test_scale_factor = 2.0f;
 float _baro_gnd_effect_dead_zone = 4.0f;
 int8_t _primary_core = EKF3_PRIMARY_DEFAULT;
 
-const float gps_nevel_var_acc_scale = 0.05f;
-const float gps_dvel_var_acc_scale = 0.07f;
-const float gps_pos_var_acc_scale = 0.05f;
+const float _gps_ne_vel_var_acc_scale = 0.05f;
+const float _gps_d_vel_var_acc_scale = 0.07f;
+const float _gps_pos_var_acc_scale = 0.05f;
 const float ext_nav_vel_var_acc_scale = 0.05f;
 const uint16_t mag_delay_ms = 60;
 const uint16_t tas_delay_ms = 100;
-const uint16_t tilt_drift_time_max_ms = 15000;
-const uint16_t pos_retry_time_use_vel_ms = 10000;
-const uint16_t pos_retry_time_no_vel_ms = 7000;
-const uint16_t hgt_retry_time_mode0_ms = 10000;
-const uint16_t hgt_retry_time_mode12_ms = 5000;
+const uint16_t _tilt_drift_time_max_ms = 15000;
+const uint16_t _pos_retry_time_use_vel_ms = 10000;
+const uint16_t _pos_retry_time_no_vel_ms = 7000;
+const uint16_t _hgt_retry_time_mode0_ms = 10000;
+const uint16_t _hgt_retry_time_mode12_ms = 5000;
 const uint16_t tas_retry_time_ms = 5000;
-const uint32_t mag_fail_time_limit_ms = 10000;
-const float mag_var_rate_scale = 0.005f;
+const uint32_t _mag_fail_time_limit_ms = 10000;
+const float _mag_var_rate_scale = 0.005f;
 const float gyro_bias_noise_scaler = 2.0f;
 const uint16_t hgt_avg_ms = 100;
 const uint16_t beta_avg_ms = 100;
@@ -133,7 +140,8 @@ const uint8_t ext_nav_interval_min_ms = 20;
 const float max_yaw_est_vel_innov = 2.0f;
 const uint16_t dead_reckon_declare_ms = 1000;
 
-
+extern bool _ekf3_core_have_inited;
+extern output_elements_t _output_data_new;
 yaw_reset_data_t yaw_reset_data;
 pos_reset_data_t pos_reset_data;
 pos_down_reset_data_t pos_down_reset_data;
@@ -142,17 +150,11 @@ static bool ekf_enable;
 uint64_t _imu_sample_time_us;
 static uint32_t frame_time_usec;
 static uint8_t frames_per_prediction;
-location_t common_ekf_origin;
 bool _common_origin_valid;
 static uint64_t core_last_time_primary_us;
 
-bool core_setup_required;
 static float core_relative_errors;
 __attribute__((unused))static float core_error_scores;
-uint8_t core_imu_index;
-uint8_t num_cores;
-
-int16_t _mag_ef_limit;
 
 void set_ekf_enable(bool enable)
 {
@@ -169,30 +171,28 @@ void ekf3_init(void)
 
 }
 
-bool ekf_initialise_filter(void)
+bool ekf3_initialise_filter(void)
 {
     if (ekf_enable == 0) {
         return false;
     }
     dal_start_frame();
-    _imu_sample_time_us = xtimer_now64().ticks64;
+    _imu_sample_time_us = dal_micros64();
     const float loop_rate = dal_ins_get_loop_rate_hz();
     if (!float_is_positive(loop_rate)) {
         return false;
     }
-    DEBUG("ins loop rate = %d\n", (int)loop_rate);
+    //DEBUG("ins loop rate = %d\n", (int)loop_rate); //50
     frame_time_usec = 1e6 / loop_rate;
     frames_per_prediction = (uint8_t)(EKF_TARGET_DT / (frame_time_usec * 1.0e-6) + 0.5);
-    DEBUG("frame per prediction = %d\n", frames_per_prediction);
-    if (true) {
-        core_setup_required = true;
-        core_imu_index = 0;
-        num_cores = 1;
+    //DEBUG("frame per prediction = %d\n", frames_per_prediction); //1
+    if (!_ekf3_core_have_inited) {
         init_ekf3_core();
-    }
-    bool core_setup_success = ekf3_setup_core();
-    if (!core_setup_success) {
-        return false;
+        bool core_setup_success = ekf3_setup_core();
+        if (!core_setup_success) {
+            MY_LOG("ekf3 core setup failed\n");
+            return false;
+        }
     }
     reset_core_errors();
     _common_origin_valid = false;
@@ -209,7 +209,40 @@ bool ekf3_get_llh(location_t *loc)
     return ekf3_core_get_llh(loc);
 }
 
+bool ekf3_get_origin_llh(location_t *loc)
+{
+    return ekf3_core_get_origin_llh(loc);
+}
+
 void ekf3_reset_gyro_bias(void)
 {
     ekf3_core_reset_gyro_bias();
+}
+
+void ekf3_update_filter(void)
+{
+    dal_start_frame();
+    _imu_sample_time_us = dal_micros64();
+    bool allow_state_prediction = true;
+    /* if (ekf3_core_get_frames_since_predict() < (frames_per_prediction + 3) && */
+    /* dal_ekf_low_time_remaining()) { */
+    /*     allow_state_prediction = false; */
+    /*     MY_LOG("ekf3 allow state precdiction = false"); */
+    /* } */
+    ekf3_core_update_filter(allow_state_prediction);
+}
+
+void ekf3_get_rotation_body_to_ned(matrix3f_t *mat)
+{
+    quat_to_rotation_matrix(&_output_data_new.quat, mat);
+}
+
+void ekf3_get_euler_angles(vector3f_t *euler)
+{
+    ekf3_core_get_euler_angles(euler);
+}
+
+void ekf3_get_vel_ned(vector3f_t *vel)
+{
+    ekf3_core_get_vel_ned(vel);
 }
